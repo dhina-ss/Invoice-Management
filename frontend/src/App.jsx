@@ -1,0 +1,364 @@
+import React, { useState, useEffect } from 'react';
+import BillForm from './components/BillForm';
+import BillPreview from './components/BillPreview';
+import SettingsModal from './components/SettingsModal';
+import Dashboard from './components/Dashboard';
+
+const DEFAULT_BILL = {
+  id: '',
+  company: 'All Care',
+  place: '',
+  designation: '',
+  noOfPersonal: '',
+  noOfDuties: '0',
+  rate: '',
+  billDate: new Date().toISOString().split('T')[0], // Default to today
+  fromDate: '',
+  toDate: '',
+  digitalSign: false,
+  eliteSameParticularsRate: false,
+  eliteItems: [{
+    particulars: 'Loaders',
+    qty: '',
+    rate: ''
+  }]
+};
+
+export default function App() {
+  const [activeBill, setActiveBill] = useState(DEFAULT_BILL);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  
+  const [customAddresses, setCustomAddresses] = useState({
+    tidy: {
+      client: 'M/S DTDC EXPRESS LIMITED,\n136, DIAMOND TOWER,\nA-20 TVK INDUSTRIAL ESTATE,\nGUINDY, CHENNAI-600032.',
+      place: ''
+    },
+    allCare: {
+      company: 'NO. 381/385, VENNU GOPAL LAYOUT, PN PALAYAM, PAPPANAICKENPALAYAM, COIMBATORE, TAMIL NADU – 641037.\nPhone: +91 95005 95749',
+      client: 'DTDC Express Limited,\nNo. 92, Parameshwaran Layout,\nPappanaickenpalayam,\nCoimbatore, Tamil Nadu - 641037'
+    },
+    elite: {
+      company: 'No. 125, Annai Velakanni Nagar,\nSowripalayam, Coimbatore,\nTamilnadu - 641028.',
+      clientSalem: 'DTDC Express Limited,\nNo. 12, Salem Main Road,\nSalem,\nTamil Nadu - 636001.',
+      clientCoimbatore: 'DTDC Express Limited,\nNo. 396, Ponniyakadu Thottam,\nSengodagoundan Pudur, Salem-Kochi NH,\nSulur Pirivu, Coimbatore,\nTamil Nadu - 641037.'
+    }
+  });
+
+  const [activeView, setActiveView] = useState('dashboard'); // 'invoice' or 'dashboard'
+  const [bills, setBills] = useState([]);
+  const [billsLoading, setBillsLoading] = useState(false);
+  const [billsError, setBillsError] = useState('');
+
+  // Display toast message
+  const showToast = (message) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  const fetchBills = async () => {
+    setBillsLoading(true);
+    setBillsError('');
+    try {
+      const response = await fetch('/api/bills');
+      if (response.ok) {
+        const data = await response.json();
+        setBills(data);
+      } else {
+        setBillsError('Could not load bill history.');
+      }
+    } catch (err) {
+      console.error(err);
+      setBillsError('Could not load bill history.');
+    } finally {
+      setBillsLoading(false);
+    }
+  };
+
+  // Load custom addresses and bills list from backend on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.customAddresses) {
+            setCustomAddresses(data.customAddresses);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    };
+    loadSettings();
+    fetchBills();
+  }, []);
+
+  // Fetch sequential invoice number on company change (only if drafting a new bill)
+  useEffect(() => {
+    const fetchInvoiceNumber = async () => {
+      if (!activeBill.company || activeBill.id) return;
+      try {
+        const billYear = activeBill.billDate ? activeBill.billDate.split('-')[0].substring(2) : new Date().getFullYear().toString().substring(2);
+        const response = await fetch(`/api/invoice-number?company=${encodeURIComponent(activeBill.company)}&advance=false&year=${billYear}`);
+        if (response.ok) {
+          const data = await response.json();
+          setActiveBill(prev => {
+            if (prev.id) return prev; // Do not overwrite if a bill was loaded
+            return {
+              ...prev,
+              invoiceNumber: data.invoiceNumber
+            };
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch invoice number:', err);
+      }
+    };
+    fetchInvoiceNumber();
+  }, [activeBill.company, activeBill.id, activeBill.billDate]);
+
+  // Disable background scrolling when modal is open
+  useEffect(() => {
+    if (isSettingsOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isSettingsOpen]);
+
+  // Update active bill draft from form inputs
+  const handleFormChange = (updatedBill) => {
+    setActiveBill(updatedBill);
+  };
+
+  // Reset form to blank template
+  const handleResetForm = () => {
+    setActiveBill({
+      ...DEFAULT_BILL,
+      billDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  // Persist custom settings to backend database
+  const handleSaveSettings = async () => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customAddresses })
+      });
+      if (response.ok) {
+        showToast('Settings saved successfully!');
+      } else {
+        alert('Failed to save settings.');
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      alert('Error connecting to backend to save settings.');
+    }
+    setIsSettingsOpen(false);
+  };
+
+  // Save current bill/invoice to database
+  const handleSaveBill = async () => {
+    try {
+      const isNew = !activeBill.id;
+      let url = '/api/bills';
+      let method = 'POST';
+
+      if (!isNew) {
+        url = `/api/bills/${activeBill.id}`;
+        method = 'PUT';
+      }
+
+      // If saving a new invoice, advance the database sequence and get the final number
+      let finalInvoiceNumber = activeBill.invoiceNumber;
+      if (isNew) {
+        const billYear = activeBill.billDate ? activeBill.billDate.split('-')[0].substring(2) : new Date().getFullYear().toString().substring(2);
+        const invResp = await fetch(`/api/invoice-number?company=${encodeURIComponent(activeBill.company)}&advance=true&year=${billYear}`);
+        if (invResp.ok) {
+          const invData = await invResp.json();
+          finalInvoiceNumber = invData.invoiceNumber;
+        }
+      }
+
+      const payload = {
+        invoiceNumber: finalInvoiceNumber,
+        data: {
+          ...activeBill,
+          invoiceNumber: finalInvoiceNumber
+        }
+      };
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const savedBill = await response.json();
+        setActiveBill({
+          ...savedBill.data,
+          id: savedBill.id,
+          invoiceNumber: savedBill.invoiceNumber
+        });
+        fetchBills();
+        showToast(isNew ? 'Invoice saved to history!' : 'Invoice updated in history!');
+      } else {
+        alert('Failed to save invoice.');
+      }
+    } catch (err) {
+      console.error('Error saving invoice:', err);
+      alert('Error connecting to backend to save invoice.');
+    }
+  };
+
+  const handleDeleteBill = async (id) => {
+    try {
+      const response = await fetch(`/api/bills/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        setBills(prev => prev.filter(bill => bill.id !== id));
+        return true;
+      }
+    } catch (err) {
+      console.error('Error deleting bill:', err);
+    }
+    return false;
+  };
+
+  const handleUpdateBillStatus = async (id, currentStatus, tds = null, receivedAmount = null) => {
+    const nextStatus = currentStatus === 'Received' ? 'Pending' : 'Received';
+    try {
+      const payload = { status: nextStatus };
+      if (tds !== null) payload.tds = tds;
+      if (receivedAmount !== null) payload.receivedAmount = receivedAmount;
+
+      const response = await fetch(`/api/bills/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const updatedBill = await response.json();
+        setBills(prev => prev.map(bill => bill.id === id ? { ...bill, status: updatedBill.status, data: updatedBill.data } : bill));
+        showToast(`Invoice status updated to ${updatedBill.status}`);
+        return true;
+      }
+    } catch (err) {
+      console.error('Error updating bill status:', err);
+    }
+    return false;
+  };
+
+  // Load selected bill from history
+  const handleLoadBill = (bill) => {
+    setActiveBill({
+      ...bill.data,
+      id: bill.id,
+      invoiceNumber: bill.invoiceNumber
+    });
+    showToast(`Loaded invoice ${bill.invoiceNumber || bill.id}`);
+  };
+
+  return (
+    <div className="app-container">
+      {/* Main Workspace split into Form and Print Preview */}
+      <main className="main-layout">
+        <header className="header">
+          <h1>Invoice Management</h1>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              className={`icon-btn ${activeView === 'dashboard' ? 'active' : ''}`}
+              title="Dashboard"
+              onClick={() => setActiveView('dashboard')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="9"></rect>
+                <rect x="14" y="3" width="7" height="5"></rect>
+                <rect x="14" y="12" width="7" height="9"></rect>
+                <rect x="3" y="16" width="7" height="5"></rect>
+              </svg>
+            </button>
+            <button
+              className={`icon-btn ${activeView === 'invoice' ? 'active' : ''}`}
+              title="Invoice Creator"
+              onClick={() => setActiveView('invoice')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+            </button>
+            <button className="icon-btn" title="Settings" onClick={() => setIsSettingsOpen(true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        {activeView === 'dashboard' ? (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Dashboard
+              bills={bills}
+              onLoadBill={handleLoadBill}
+              onViewChange={setActiveView}
+              onUpdateBillStatus={handleUpdateBillStatus}
+              onDeleteBill={handleDeleteBill}
+            />
+          </div>
+        ) : (
+          <>
+            <section>
+              <BillForm
+                activeBill={activeBill}
+                onChange={handleFormChange}
+                onReset={handleResetForm}
+              />
+            </section>
+
+            <section>
+              <BillPreview 
+                activeBill={activeBill} 
+                customAddresses={customAddresses} 
+                onSaveBill={handleSaveBill} 
+              />
+            </section>
+          </>
+        )}
+      </main>
+
+      {/* Settings Popup Card */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={handleSaveSettings}
+        customAddresses={customAddresses}
+        onCustomAddressesChange={setCustomAddresses}
+      />
+
+
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="toast-notification">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          {toastMessage}
+        </div>
+      )}
+    </div>
+  );
+}
+
