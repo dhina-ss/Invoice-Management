@@ -16,7 +16,7 @@ from routes.sign import sign_bp
 def get_frontend_dist_path():
     if getattr(sys, 'frozen', False):
         # Running as a PyInstaller bundle
-        return os.path.join(sys._MEIPASS, 'dist')
+        return os.path.join(sys._MEIPASS, 'frontend', 'dist')
     else:
         # Running as a normal script
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'dist')

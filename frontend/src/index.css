@@ -105,7 +105,7 @@ body {
   padding-top: 1.5rem;
   display: grid;
   grid-template-columns: 4fr 6fr;
-  gap: 2.5rem;
+  gap: 2rem;
   align-items: start;
 }
 
@@ -1306,4 +1306,8 @@ details.settings-section summary:hover {
 
 .dashboard-table-wrapper::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
+}
+
+.capitalize {
+  text-transform: capitalize;
 }

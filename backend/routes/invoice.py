@@ -46,9 +46,9 @@ def get_invoice_number():
     if company == "All Care":
         invoice_number = f"ALC{year_suffix}{str(counter).zfill(5)}"
     elif company == "Elite":
-        invoice_number = f"ELT-{str(counter).zfill(4)}"
+        invoice_number = f"ELT{year_suffix}{str(counter).zfill(5)}"
     else:
-        invoice_number = f"TDY-{str(counter).zfill(4)}"
+        invoice_number = f"TDY{year_suffix}{str(counter).zfill(5)}"
 
     return jsonify({
         "company": company,

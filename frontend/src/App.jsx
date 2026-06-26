@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import BillForm from './components/BillForm';
 import BillPreview from './components/BillPreview';
 import SettingsModal from './components/SettingsModal';
@@ -12,7 +13,7 @@ const DEFAULT_BILL = {
   noOfPersonal: '',
   noOfDuties: '0',
   rate: '',
-  billDate: new Date().toISOString().split('T')[0], // Default to today
+  billDate: new Date().toISOString().split('T')[0],
   fromDate: '',
   toDate: '',
   digitalSign: false,
@@ -28,29 +29,33 @@ export default function App() {
   const [activeBill, setActiveBill] = useState(DEFAULT_BILL);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  
+
   const [customAddresses, setCustomAddresses] = useState({
     tidy: {
       client: 'M/S DTDC EXPRESS LIMITED,\n136, DIAMOND TOWER,\nA-20 TVK INDUSTRIAL ESTATE,\nGUINDY, CHENNAI-600032.',
       place: ''
     },
     allCare: {
-      company: 'NO. 381/385, VENNU GOPAL LAYOUT, PN PALAYAM, PAPPANAICKENPALAYAM, COIMBATORE, TAMIL NADU – 641037.\nPhone: +91 95005 95749',
+      company: 'NO. 381/385, VENNU GOPAL LAYOUT, PN PALAYAM, PAPPANAICKENPALAYAM, COIMBATORE, TAMIL NADU \u2013 641037.\nPhone: +91 95005 95749',
       client: 'DTDC Express Limited,\nNo. 92, Parameshwaran Layout,\nPappanaickenpalayam,\nCoimbatore, Tamil Nadu - 641037'
     },
     elite: {
       company: 'No. 125, Annai Velakanni Nagar,\nSowripalayam, Coimbatore,\nTamilnadu - 641028.',
       clientSalem: 'DTDC Express Limited,\nNo. 12, Salem Main Road,\nSalem,\nTamil Nadu - 636001.',
-      clientCoimbatore: 'DTDC Express Limited,\nNo. 396, Ponniyakadu Thottam,\nSengodagoundan Pudur, Salem-Kochi NH,\nSulur Pirivu, Coimbatore,\nTamil Nadu - 641037.'
+      clientCoimbatore: 'DTDC Express Limited,\nNo. 396, Ponniyakadu Thottam,\nSengodagoundan Pudur, Salem-Kochi NH,\nSulur Pirivu, Coimbatore,\nTamil Nadu - 641037.',
+      billTo: '',
+      supplyTo: ''
     }
   });
 
-  const [activeView, setActiveView] = useState('dashboard'); // 'invoice' or 'dashboard'
   const [bills, setBills] = useState([]);
   const [billsLoading, setBillsLoading] = useState(false);
   const [billsError, setBillsError] = useState('');
+  const [settingsVersion, setSettingsVersion] = useState(0); // increments on every settings save to trigger BillForm refresh
 
-  // Display toast message
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const showToast = (message) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(''), 3000);
@@ -75,7 +80,6 @@ export default function App() {
     }
   };
 
-  // Load custom addresses and bills list from backend on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -94,7 +98,6 @@ export default function App() {
     fetchBills();
   }, []);
 
-  // Fetch sequential invoice number on company change (only if drafting a new bill)
   useEffect(() => {
     const fetchInvoiceNumber = async () => {
       if (!activeBill.company || activeBill.id) return;
@@ -104,11 +107,8 @@ export default function App() {
         if (response.ok) {
           const data = await response.json();
           setActiveBill(prev => {
-            if (prev.id) return prev; // Do not overwrite if a bill was loaded
-            return {
-              ...prev,
-              invoiceNumber: data.invoiceNumber
-            };
+            if (prev.id) return prev;
+            return { ...prev, invoiceNumber: data.invoiceNumber };
           });
         }
       } catch (err) {
@@ -118,32 +118,21 @@ export default function App() {
     fetchInvoiceNumber();
   }, [activeBill.company, activeBill.id, activeBill.billDate]);
 
-  // Disable background scrolling when modal is open
   useEffect(() => {
     if (isSettingsOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    return () => { document.body.style.overflow = 'unset'; };
   }, [isSettingsOpen]);
 
-  // Update active bill draft from form inputs
-  const handleFormChange = (updatedBill) => {
-    setActiveBill(updatedBill);
-  };
+  const handleFormChange = (updatedBill) => setActiveBill(updatedBill);
 
-  // Reset form to blank template
   const handleResetForm = () => {
-    setActiveBill({
-      ...DEFAULT_BILL,
-      billDate: new Date().toISOString().split('T')[0]
-    });
+    setActiveBill({ ...DEFAULT_BILL, billDate: new Date().toISOString().split('T')[0] });
   };
 
-  // Persist custom settings to backend database
   const handleSaveSettings = async () => {
     try {
       const response = await fetch('/api/settings', {
@@ -152,6 +141,7 @@ export default function App() {
         body: JSON.stringify({ customAddresses })
       });
       if (response.ok) {
+        setSettingsVersion(v => v + 1); // trigger BillForm to re-fetch places/particulars/types
         showToast('Settings saved successfully!');
       } else {
         alert('Failed to save settings.');
@@ -163,7 +153,6 @@ export default function App() {
     setIsSettingsOpen(false);
   };
 
-  // Save current bill/invoice to database
   const handleSaveBill = async () => {
     try {
       const isNew = !activeBill.id;
@@ -175,7 +164,6 @@ export default function App() {
         method = 'PUT';
       }
 
-      // If saving a new invoice, advance the database sequence and get the final number
       let finalInvoiceNumber = activeBill.invoiceNumber;
       if (isNew) {
         const billYear = activeBill.billDate ? activeBill.billDate.split('-')[0].substring(2) : new Date().getFullYear().toString().substring(2);
@@ -184,29 +172,30 @@ export default function App() {
           const invData = await invResp.json();
           finalInvoiceNumber = invData.invoiceNumber;
         }
+      } else if (finalInvoiceNumber) {
+        const match = finalInvoiceNumber.match(/^(TDY|ELT)-(\d+)$/);
+        if (match) {
+          const prefix = match[1];
+          const counter = parseInt(match[2], 10);
+          const billYear = activeBill.billDate ? activeBill.billDate.split('-')[0].substring(2) : new Date().getFullYear().toString().substring(2);
+          finalInvoiceNumber = `${prefix}${billYear}${String(counter).padStart(5, '0')}`;
+        }
       }
 
       const payload = {
         invoiceNumber: finalInvoiceNumber,
-        data: {
-          ...activeBill,
-          invoiceNumber: finalInvoiceNumber
-        }
+        data: { ...activeBill, invoiceNumber: finalInvoiceNumber }
       };
 
       const response = await fetch(url, {
-        method: method,
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         const savedBill = await response.json();
-        setActiveBill({
-          ...savedBill.data,
-          id: savedBill.id,
-          invoiceNumber: savedBill.invoiceNumber
-        });
+        setActiveBill({ ...savedBill.data, id: savedBill.id, invoiceNumber: savedBill.invoiceNumber });
         fetchBills();
         showToast(isNew ? 'Invoice saved to history!' : 'Invoice updated in history!');
       } else {
@@ -220,9 +209,7 @@ export default function App() {
 
   const handleDeleteBill = async (id) => {
     try {
-      const response = await fetch(`/api/bills/${id}`, {
-        method: 'DELETE'
-      });
+      const response = await fetch(`/api/bills/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setBills(prev => prev.filter(bill => bill.id !== id));
         return true;
@@ -257,27 +244,25 @@ export default function App() {
     return false;
   };
 
-  // Load selected bill from history
+  // Load selected bill from history and navigate to /invoice
   const handleLoadBill = (bill) => {
-    setActiveBill({
-      ...bill.data,
-      id: bill.id,
-      invoiceNumber: bill.invoiceNumber
-    });
+    setActiveBill({ ...bill.data, id: bill.id, invoiceNumber: bill.invoiceNumber });
     showToast(`Loaded invoice ${bill.invoiceNumber || bill.id}`);
+    navigate('/invoice');
   };
+
+  const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
 
   return (
     <div className="app-container">
-      {/* Main Workspace split into Form and Print Preview */}
       <main className="main-layout">
         <header className="header">
           <h1>Invoice Management</h1>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <button
-              className={`icon-btn ${activeView === 'dashboard' ? 'active' : ''}`}
+              className={`icon-btn ${isDashboard ? 'active' : ''}`}
               title="Dashboard"
-              onClick={() => setActiveView('dashboard')}
+              onClick={() => navigate('/dashboard')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="9"></rect>
@@ -287,9 +272,9 @@ export default function App() {
               </svg>
             </button>
             <button
-              className={`icon-btn ${activeView === 'invoice' ? 'active' : ''}`}
+              className={`icon-btn ${location.pathname === '/invoice' ? 'active' : ''}`}
               title="Invoice Creator"
-              onClick={() => setActiveView('invoice')}
+              onClick={() => navigate('/invoice')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -307,38 +292,55 @@ export default function App() {
           </div>
         </header>
 
-        {activeView === 'dashboard' ? (
-          <div style={{ gridColumn: '1 / -1' }}>
-            <Dashboard
-              bills={bills}
-              onLoadBill={handleLoadBill}
-              onViewChange={setActiveView}
-              onUpdateBillStatus={handleUpdateBillStatus}
-              onDeleteBill={handleDeleteBill}
-            />
-          </div>
-        ) : (
-          <>
-            <section>
-              <BillForm
-                activeBill={activeBill}
-                onChange={handleFormChange}
-                onReset={handleResetForm}
-              />
-            </section>
+        <Routes>
+          {/* Redirect root → /dashboard */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            <section>
-              <BillPreview 
-                activeBill={activeBill} 
-                customAddresses={customAddresses} 
-                onSaveBill={handleSaveBill} 
-              />
-            </section>
-          </>
-        )}
+          {/* Dashboard */}
+          <Route
+            path="/dashboard"
+            element={
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Dashboard
+                  bills={bills}
+                  onLoadBill={handleLoadBill}
+                  onViewChange={(view) => navigate(`/${view}`)}
+                  onUpdateBillStatus={handleUpdateBillStatus}
+                  onDeleteBill={handleDeleteBill}
+                />
+              </div>
+            }
+          />
+
+          {/* Invoice creator */}
+          <Route
+            path="/invoice"
+            element={
+              <>
+                <section>
+                  <BillForm
+                    activeBill={activeBill}
+                    onChange={handleFormChange}
+                    onReset={handleResetForm}
+                    settingsVersion={settingsVersion}
+                  />
+                </section>
+                <section>
+                  <BillPreview
+                    activeBill={activeBill}
+                    customAddresses={customAddresses}
+                    onSaveBill={handleSaveBill}
+                  />
+                </section>
+              </>
+            }
+          />
+
+          {/* Any unknown path → dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </main>
 
-      {/* Settings Popup Card */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -347,9 +349,6 @@ export default function App() {
         onCustomAddressesChange={setCustomAddresses}
       />
 
-
-
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="toast-notification">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -361,4 +360,3 @@ export default function App() {
     </div>
   );
 }
-

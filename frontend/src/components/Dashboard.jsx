@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import CustomSelect from './CustomSelect';
 
 export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBillStatus, onDeleteBill }) {
 
@@ -27,17 +28,58 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 		}
 	};
 
-	// Compute overall stats
-	const totalInvoices = bills.length;
-	const totalRevenue = bills.reduce((sum, bill) => {
+	// States for filters
+	const [selectedCompany, setSelectedCompany] = useState('All');
+	const [selectedStatus, setSelectedStatus] = useState('All');
+	const [startDate, setStartDate] = useState('');
+	const [endDate, setEndDate] = useState('');
+	const [currentPage, setCurrentPage] = useState(1);
+	const [statusConfirm, setStatusConfirm] = useState(null);
+	const [tdsInput, setTdsInput] = useState('');
+	const [deleteConfirm, setDeleteConfirm] = useState(null);
+	const itemsPerPage = 10;
+
+	// Reset page to 1 when filters change
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [selectedCompany, selectedStatus, startDate, endDate]);
+
+	// Filter bills based on current criteria
+	const filteredBills = bills.filter(bill => {
+		// Company filter
+		if (selectedCompany !== 'All' && bill.company !== selectedCompany) {
+			return false;
+		}
+
+		// Status filter
+		if (selectedStatus !== 'All') {
+			const billStatus = bill.status || 'Pending';
+			if (selectedStatus === 'Received' && billStatus !== 'Received') return false;
+			if (selectedStatus === 'Pending' && billStatus === 'Received') return false;
+		}
+
+		// Date range selector
+		if (startDate && bill.billDate < startDate) {
+			return false;
+		}
+		if (endDate && bill.billDate > endDate) {
+			return false;
+		}
+
+		return true;
+	});
+
+	// Compute overall stats for filtered bills
+	const totalInvoices = filteredBills.length;
+	const totalRevenue = filteredBills.reduce((sum, bill) => {
 		const billTotal = calculateGrandTotal(bill);
 		const netTotal = bill.status === 'Received'
 			? (bill.data?.receivedAmount !== undefined ? bill.data.receivedAmount : (billTotal - (bill.data?.tds || 0)))
 			: billTotal;
 		return sum + netTotal;
 	}, 0);
-	const receivedCount = bills.filter(bill => bill.status === 'Received').length;
-	const pendingCount = bills.filter(bill => bill.status !== 'Received').length;
+	const receivedCount = filteredBills.filter(bill => bill.status === 'Received').length;
+	const pendingCount = filteredBills.filter(bill => bill.status !== 'Received').length;
 
 	// Format currency value to INR format
 	const formatCurrency = (val) => {
@@ -57,12 +99,20 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 		return dateStr;
 	};
 
-	const sortedBills = [...bills].sort((a, b) => (b.id || 0) - (a.id || 0));
-	const [currentPage, setCurrentPage] = useState(1);
-	const [statusConfirm, setStatusConfirm] = useState(null);
-	const [tdsInput, setTdsInput] = useState('');
-	const [deleteConfirm, setDeleteConfirm] = useState(null);
-	const itemsPerPage = 10;
+	// Normalise old-format invoice numbers (TDY-0001 → TDY2600001, ELT-0003 → ELT2600003)
+	const normalizeInvoiceNumber = (num, billDate) => {
+		if (!num) return num;
+		const match = num.match(/^(TDY|ELT)-(\d+)$/);
+		if (match) {
+			const prefix = match[1];
+			const counter = parseInt(match[2], 10);
+			const yr = billDate && billDate.length >= 4 ? billDate.slice(2, 4) : new Date().getFullYear().toString().slice(-2);
+			return `${prefix}${yr}${String(counter).padStart(5, '0')}`;
+		}
+		return num;
+	};
+
+	const sortedBills = [...filteredBills].sort((a, b) => (b.id || 0) - (a.id || 0));
 
 	const confirmingBill = statusConfirm ? bills.find(b => b.id === statusConfirm.id) : null;
 	const grandTotal = confirmingBill ? calculateGrandTotal(confirmingBill) : 0;
@@ -89,6 +139,13 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 			setCurrentPage(totalPages || 1);
 		}
 	}, [sortedBills.length, totalPages, currentPage]);
+
+	const handleClearFilters = () => {
+		setSelectedCompany('All');
+		setSelectedStatus('All');
+		setStartDate('');
+		setEndDate('');
+	};
 
 	return (
 		<div className="dashboard-container animated-fade-in">
@@ -164,6 +221,113 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 					</div>
 				</div>
 			</div>
+			{/* Filters Section */}
+			<div className="glass-card" style={{ 
+				display: 'flex', 
+				flexWrap: 'wrap', 
+				gap: '1.25rem', 
+				alignItems: 'flex-end',
+				justifyContent: 'space-between',
+				border: 'none',
+				boxShadow: 'none',
+				background: 'transparent'
+			}}>
+				<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', flex: 1, justifyContent: 'end' }}>
+					{/* Company Filter */}
+					<div style={{ minWidth: '180px' }}>
+						<CustomSelect
+							value={selectedCompany}
+							onChange={(val) => setSelectedCompany(val)}
+							options={[
+								{ value: 'All', label: 'All Companies' },
+								{ value: 'Elite', label: 'Elite' },
+								{ value: 'All Care', label: 'All Care' },
+								{ value: 'Tidy', label: 'Tidy' },
+							]}
+							placeholder="All Companies"
+							style={{ fontSize: '0.9rem', height: '42px', borderRadius: 'var(--border-radius-sm)' }}
+						/>
+					</div>
+
+					{/* Status Filter */}
+					<div style={{ minWidth: '180px' }}>
+						<CustomSelect
+							value={selectedStatus}
+							onChange={(val) => setSelectedStatus(val)}
+							options={[
+								{ value: 'All', label: 'All Status' },
+								{ value: 'Pending', label: 'Pending' },
+								{ value: 'Received', label: 'Received' },
+							]}
+							placeholder="All Status"
+							style={{ fontSize: '0.9rem', height: '42px', borderRadius: 'var(--border-radius-sm)' }}
+						/>
+					</div>
+
+					{/* Date Range Selector */}
+					<div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+						<div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
+							<input 
+								type="date"
+								lang="en-GB"
+								className="form-input" 
+								style={{ padding: '0.55rem 1.25rem 0.55rem 1rem', fontSize: '0.9rem', height: '42px', borderRadius: 'var(--border-radius-sm)' }}
+								value={startDate}
+								onChange={(e) => setStartDate(e.target.value)}
+							/>
+						</div>
+						<span style={{ paddingBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '500' }}>to</span>
+						<div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
+							<input 
+								type="date"
+								lang="en-GB"
+								className="form-input" 
+								style={{ padding: '0.55rem 1.25rem 0.55rem 1rem', fontSize: '0.9rem', height: '42px', borderRadius: 'var(--border-radius-sm)' }}
+								value={endDate}
+								onChange={(e) => setEndDate(e.target.value)}
+							/>
+						</div>
+					</div>
+				</div>
+
+				{/* Clear Filters Button */}
+				{(selectedCompany !== 'All' || selectedStatus !== 'All' || startDate || endDate) && (
+					<button 
+						type="button" 
+						className="btn btn-secondary animate-fade-in" 
+						style={{ 
+							padding: '0.55rem 1.25rem', 
+							fontSize: '0.85rem', 
+							borderRadius: 'var(--border-radius-sm)', 
+							cursor: 'pointer',
+							height: '42px',
+							width: 'auto',
+							display: 'inline-flex',
+							alignItems: 'center',
+							gap: '0.5rem',
+							backgroundColor: 'rgba(239, 68, 68, 0.08)',
+							border: '1px solid rgba(239, 68, 68, 0.25)',
+							color: '#f87171',
+							transition: 'all 0.2s ease'
+						}}
+						onMouseEnter={(e) => {
+							e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+							e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+						}}
+						onMouseLeave={(e) => {
+							e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+							e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+						}}
+						onClick={handleClearFilters}
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+							<line x1="18" y1="6" x2="6" y2="18"></line>
+							<line x1="6" y1="6" x2="18" y2="18"></line>
+						</svg>
+						Clear Filters
+					</button>
+				)}
+			</div>
 
 			{/* Invoice Details Table */}
 			<div className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 'none' }}>
@@ -216,7 +380,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 										<tr key={bill.id}>
 											<td>{startIndex + index + 1}</td>
 											<td>
-												<strong>{bill.invoiceNumber || `INV-${String(bill.id).padStart(4, '0')}`}</strong>
+												<strong>{normalizeInvoiceNumber(bill.invoiceNumber, bill.billDate) || `INV-${String(bill.id).padStart(4, '0')}`}</strong>
 											</td>
 											<td>{formatDate(bill.billDate)}</td>
 											<td>
@@ -362,7 +526,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 						padding: '1rem',
 						borderTop: '1px solid var(--card-border)'
 					}}>
-						<span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+						<span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
 							Showing <strong>{startIndex + 1}</strong> to <strong>{Math.min(startIndex + itemsPerPage, sortedBills.length)}</strong> of <strong>{sortedBills.length}</strong> entries
 						</span>
 						<div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
@@ -371,7 +535,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 								className="btn btn-secondary btn-sm"
 								style={{
 									padding: '0.3rem 0.6rem',
-									fontSize: '0.75rem',
+									fontSize: '1rem',
 									borderRadius: '6px',
 									cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
 									opacity: currentPage === 1 ? 0.5 : 1,
@@ -390,7 +554,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 									type="button"
 									style={{
 										padding: '0.3rem 0.6rem',
-										fontSize: '0.75rem',
+										fontSize: '1rem',
 										borderRadius: '6px',
 										cursor: 'pointer',
 										background: currentPage === page ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
@@ -413,7 +577,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 								className="btn btn-secondary btn-sm"
 								style={{
 									padding: '0.3rem 0.6rem',
-									fontSize: '0.75rem',
+									fontSize: '1rem',
 									borderRadius: '6px',
 									cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
 									opacity: currentPage === totalPages ? 0.5 : 1,
@@ -618,7 +782,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 								Delete Invoice
 							</h3>
 							<p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-								Are you sure you want to delete invoice <strong>{deleteConfirm.invoiceNumber || `INV-${String(deleteConfirm.id).padStart(4, '0')}`}</strong>? This action cannot be undone.
+								Are you sure you want to delete invoice <strong>{normalizeInvoiceNumber(deleteConfirm.invoiceNumber, deleteConfirm.billDate) || `INV-${String(deleteConfirm.id).padStart(4, '0')}`}</strong>? This action cannot be undone.
 							</p>
 						</div>
 
@@ -661,7 +825,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 			)}
 
 			{/* Developer Footer */}
-			<div style={{ textAlign: 'center', marginTop: '2.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+			<div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '1rem' }}>
 				Designed and Developed by <a href="mailto:dhinakaran15022000@gmail.com" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 'bold' }}>Dhinakaran Sekar</a>
 			</div>
 		</div>

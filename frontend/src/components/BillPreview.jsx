@@ -159,8 +159,24 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
   const sgstAmount = subtotal * taxRate;
   const grandTotal = Math.round(subtotal + cgstAmount + sgstAmount);
 
+  // Normalise old-format invoice numbers (TDY-0001 → TDY2600001, ELT-0003 → ELT2600003)
+  const normalizeInvoiceNumber = (num) => {
+    if (!num) return num;
+    const match = num.match(/^(TDY|ELT)-(\d+)$/);
+    if (match) {
+      const prefix  = match[1];
+      const counter = parseInt(match[2], 10);
+      // Use year from billDate if available, otherwise current year
+      const yr = billDate && billDate.length >= 4 ? billDate.slice(2, 4) : new Date().getFullYear().toString().slice(-2);
+      return `${prefix}${yr}${String(counter).padStart(5, '0')}`;
+    }
+    return num;
+  };
+
   // Display generated invoice number or placeholder
-  const displayInvoiceNumber = invoiceNumber || (company.shortName === 'ELITE' ? 'ELT-0000' : company.shortName === 'ALL CARE' ? 'ALC-0000' : 'TDY-0000');
+  const currentYear = new Date().getFullYear().toString().slice(-2);
+  const rawInvoiceNumber = invoiceNumber || (company.shortName === 'ELITE' ? `ELT${currentYear}00000` : company.shortName === 'ALL CARE' ? `ALC${currentYear}00000` : `TDY${currentYear}00000`);
+  const displayInvoiceNumber = normalizeInvoiceNumber(rawInvoiceNumber);
 
   // Elite helper for client address
   const getEliteClientAddress = (placeVal) => {
@@ -416,13 +432,17 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
             <div style={{ flex: 1 }}>
               <h4 style={{ fontWeight: '700', marginBottom: '0.5rem', color: '#1f2937', fontSize: '12px', paddingBottom: '4px' }}>Bill To:</h4>
               <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.6', color: '#4b5563' }}>
-                {getEliteClientAddress(place)}
+                {customAddresses?.elite?.billTo && customAddresses.elite.billTo.trim()
+                  ? customAddresses.elite.billTo.split('\n').map((line, i) => <React.Fragment key={i}>{line}<br /></React.Fragment>)
+                  : getEliteClientAddress(place)}
               </p>
             </div>
             <div style={{ flex: 1 }}>
               <h4 style={{ fontWeight: '700', marginBottom: '0.5rem', color: '#1f2937', fontSize: '12px', paddingBottom: '4px' }}>Supply To:</h4>
               <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.6', color: '#4b5563' }}>
-                {getEliteClientAddress(place)}
+                {customAddresses?.elite?.supplyTo && customAddresses.elite.supplyTo.trim()
+                  ? customAddresses.elite.supplyTo.split('\n').map((line, i) => <React.Fragment key={i}>{line}<br /></React.Fragment>)
+                  : getEliteClientAddress(place)}
               </p>
             </div>
           </div>

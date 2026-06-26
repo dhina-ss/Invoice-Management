@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import CustomSelect from './CustomSelect';
 
+const capitalizeWords = (str) => {
+  if (!str) return '';
+  return str
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 export default function SettingsModal({ isOpen, onClose, onSave, customAddresses, onCustomAddressesChange }) {
   const [activeTab, setActiveTab] = useState('Tidy'); // Tidy, AllCare, Elite
   const [places, setPlaces] = useState([]);
@@ -249,22 +257,22 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
               onChange={(val) => setNewPlaceTypeName(val)}
               options={types.filter(t => t.company.toLowerCase() === 'all care').map(t => ({ value: t.type_name, label: t.type_name }))}
               placeholder="Select Type"
-              style={{ padding: '0.5rem 0.75rem', fontSize: '1rem' }}
+              style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
               containerStyle={{ flex: '2 1 150px' }}
             />
             <input
               type="text"
-              className="form-input"
-              style={{ padding: '0.5rem 0.75rem', fontSize: '1rem', flex: '2 1 150px' }}
+              className="form-input capitalize"
+              style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', flex: '2 1 150px' }}
               placeholder="Place Name (e.g. Salem)"
               value={newPlaceName}
-              onChange={(e) => setNewPlaceName(e.target.value)}
+              onChange={(e) => setNewPlaceName(capitalizeWords(e.target.value))}
             />
             <input
               type="number"
               min="0"
               className="form-input"
-              style={{ padding: '0.5rem 0.75rem', fontSize: '1rem', flex: '1 1 80px' }}
+              style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', flex: '1 1 80px' }}
               placeholder="Rate"
               value={newPlaceRate}
               onChange={(e) => setNewPlaceRate(e.target.value)}
@@ -288,11 +296,11 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
           <div style={{ display: 'flex', gap: '0.5rem', paddingLeft: '5px'}}>
             <input
               type="text"
-              className="form-input"
-              style={{ padding: '0.5rem 0.75rem', fontSize: '1rem' }}
+              className="form-input capitalize"
+              style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
               placeholder={`Add new place for ${dbCompany} (e.g. Salem)`}
               value={newPlaceName}
-              onChange={(e) => setNewPlaceName(e.target.value)}
+              onChange={(e) => setNewPlaceName(capitalizeWords(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -370,16 +378,17 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
         <div style={{ display: 'flex', gap: '0.5rem', paddingLeft: '5px'}}>
           <input
             type="text"
-            className="form-input"
-            style={{ padding: '0.5rem 0.75rem', fontSize: '1rem', flex: 2 }}
-            placeholder="Particular Name (e.g. MILK)"
+            className="form-input capitalize"
+            style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', flex: 2 }}
+            placeholder="Particular Name (e.g. Tea)"
             value={newParticularName}
-            onChange={(e) => setNewParticularName(e.target.value)}
+            onChange={(e) => setNewParticularName(capitalizeWords(e.target.value))}
           />
           <input
             type="number"
             className="form-input"
-            style={{ padding: '0.5rem 0.75rem', fontSize: '1rem', flex: 1 }}
+            min="0"
+            style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', flex: 1 }}
             placeholder="Rate (e.g. 15)"
             value={newParticularRate}
             onChange={(e) => setNewParticularRate(e.target.value)}
@@ -463,11 +472,11 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
         <div style={{ display: 'flex', gap: '0.5rem', paddingLeft: '5px'}}>
           <input
             type="text"
-            className="form-input"
-            style={{ padding: '0.5rem 0.75rem', fontSize: '1rem' }}
+            className="form-input capitalize"
+            style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
             placeholder={`Add new type for ${dbCompany} (e.g. Loaders)`}
             value={newTypeName}
-            onChange={(e) => setNewTypeName(e.target.value)}
+            onChange={(e) => setNewTypeName(capitalizeWords(e.target.value))}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -529,6 +538,33 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
           {activeTab === 'Tidy' && (
             <div className="tab-content animated-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {renderPlacesList('Tidy')}
+
+              {/* Address Manager Section for Tidy */}
+              <div className="address-manager-section" style={{ paddingTop: '1rem', borderTop: '1px dashed var(--card-border)', marginTop: '1rem' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.65rem' }}>
+                  Client Address
+                </h4>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block' }}>
+                    Issued To Address
+                  </label>
+                  <textarea
+                    className="address-textarea"
+                    placeholder="Enter Issued To Address..."
+                    value={customAddresses?.tidy?.client || ''}
+                    onChange={(e) => {
+                      const updated = {
+                        ...customAddresses,
+                        tidy: {
+                          ...customAddresses.tidy,
+                          client: e.target.value
+                        }
+                      };
+                      onCustomAddressesChange(updated);
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -536,6 +572,33 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
             <div className="tab-content animated-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {renderTypesList('All Care', false)}
               {renderPlacesList('All Care', true)}
+
+              {/* Address Manager Section for AllCare */}
+              <div className="address-manager-section" style={{ paddingTop: '1rem', borderTop: '1px dashed var(--card-border)', marginTop: '1rem' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.65rem' }}>
+                  Client Address
+                </h4>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block' }}>
+                    Billed To Address
+                  </label>
+                  <textarea
+                    className="address-textarea"
+                    placeholder="Enter Billed To Address..."
+                    value={customAddresses?.allCare?.client || ''}
+                    onChange={(e) => {
+                      const updated = {
+                        ...customAddresses,
+                        allCare: {
+                          ...customAddresses.allCare,
+                          client: e.target.value
+                        }
+                      };
+                      onCustomAddressesChange(updated);
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -543,6 +606,55 @@ export default function SettingsModal({ isOpen, onClose, onSave, customAddresses
             <div className="tab-content animated-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {renderPlacesList('Elite')}
               {renderParticularsList('Elite')}
+
+              {/* Address Manager Section for Elite */}
+              <div className="address-manager-section" style={{ paddingTop: '1rem', borderTop: '1px dashed var(--card-border)', marginTop: '1rem' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.65rem' }}>
+                  Client Addresses
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block' }}>
+                      Billed To Address
+                    </label>
+                    <textarea
+                      className="address-textarea"
+                      placeholder="Enter Billed To Address..."
+                      value={customAddresses?.elite?.billTo || ''}
+                      onChange={(e) => {
+                        const updated = {
+                          ...customAddresses,
+                          elite: {
+                            ...customAddresses.elite,
+                            billTo: e.target.value
+                          }
+                        };
+                        onCustomAddressesChange(updated);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block' }}>
+                      Supply To Address
+                    </label>
+                    <textarea
+                      className="address-textarea"
+                      placeholder="Enter Supply To Address..."
+                      value={customAddresses?.elite?.supplyTo || ''}
+                      onChange={(e) => {
+                        const updated = {
+                          ...customAddresses,
+                          elite: {
+                            ...customAddresses.elite,
+                            supplyTo: e.target.value
+                          }
+                        };
+                        onCustomAddressesChange(updated);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

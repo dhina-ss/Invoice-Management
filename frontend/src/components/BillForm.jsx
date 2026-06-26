@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CustomSelect from './CustomSelect';
 
-export default function BillForm({ activeBill, onChange, onReset }) {
+export default function BillForm({ activeBill, onChange, onReset, settingsVersion }) {
   const [errors, setErrors] = useState({});
   const [places, setPlaces] = useState([]);
   const [particulars, setParticulars] = useState([]);
@@ -60,7 +60,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
     fetchPlacesForCompany();
     fetchParticularsForCompany();
     fetchTypesForCompany();
-  }, [activeBill.company]);
+  }, [activeBill.company, settingsVersion]);
   const isElite = activeBill.company === 'Elite';
   const isAllCare = activeBill.company === 'All Care';
 
@@ -361,6 +361,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                   <input
                     id="billDate"
                     type="date"
+                    lang="en-GB"
                     className={`form-input form-input-with-icon ${errors.billDate ? 'error' : ''}`}
                     value={activeBill.billDate || ''}
                     onChange={(e) => handleChange('billDate', e.target.value)}
@@ -388,6 +389,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                   <input
                     id="fromDate"
                     type="date"
+                    lang="en-GB"
                     className={`form-input form-input-with-icon ${errors.fromDate ? 'error' : ''}`}
                     value={activeBill.fromDate || ''}
                     onChange={(e) => handleChange('fromDate', e.target.value)}
@@ -412,6 +414,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                   <input
                     id="toDate"
                     type="date"
+                    lang="en-GB"
                     className={`form-input form-input-with-icon ${errors.toDate ? 'error' : ''}`}
                     value={activeBill.toDate || ''}
                     onChange={(e) => handleChange('toDate', e.target.value)}
@@ -467,6 +470,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                 <input
                   id="billDate"
                   type="date"
+                  lang="en-GB"
                   className="form-input form-input-with-icon"
                   value={activeBill.billDate || ''}
                   onChange={(e) => handleChange('billDate', e.target.value)}
@@ -548,6 +552,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                   <input
                     id="fromDate"
                     type="date"
+                    lang="en-GB"
                     className={`form-input form-input-with-icon ${errors.fromDate ? 'error' : ''}`}
                     value={activeBill.fromDate}
                     onChange={(e) => handleChange('fromDate', e.target.value)}
@@ -573,6 +578,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                   <input
                     id="toDate"
                     type="date"
+                    lang="en-GB"
                     className={`form-input form-input-with-icon ${errors.toDate ? 'error' : ''}`}
                     value={activeBill.toDate}
                     onChange={(e) => handleChange('toDate', e.target.value)}
@@ -600,6 +606,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                   <input
                     id="billDate"
                     type="date"
+                    lang="en-GB"
                     className={`form-input form-input-with-icon ${errors.billDate ? 'error' : ''}`}
                     value={activeBill.billDate}
                     onChange={(e) => handleChange('billDate', e.target.value)}
@@ -844,6 +851,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                           <label className="form-label" style={{ fontSize: '0.75rem' }}>Date</label>
                           <input
                             type="date"
+                            lang="en-GB"
                             className="form-input"
                             style={{ padding: '0.6rem 0.8rem' }}
                             value={item.date || ''}
@@ -895,6 +903,7 @@ export default function BillForm({ activeBill, onChange, onReset }) {
                         <label className="form-label" style={{ fontSize: '0.75rem' }}>Date</label>
                         <input
                           type="date"
+                          lang="en-GB"
                           className="form-input"
                           style={{ padding: '0.6rem 0.8rem' }}
                           value={item.date || ''}
