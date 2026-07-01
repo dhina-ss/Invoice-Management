@@ -75,6 +75,17 @@ def init_db():
                 counter INTEGER DEFAULT 0 NOT NULL
             )
         """)
+
+        # Seed default starting counters if empty
+        cur.execute("SELECT COUNT(*) FROM invoice_counters")
+        if cur.fetchone()[0] == 0:
+            cur.execute("""
+                INSERT INTO invoice_counters (company, counter) VALUES
+                ('Tidy', 6),
+                ('Elite', 33),
+                ('All Care', 140)
+            """)
+            print("Seeded starting invoice counters.")
         
         # Place table
         cur.execute("""
@@ -141,7 +152,19 @@ def init_db():
                 ('House Keeping', 'All Care')
             """)
             print("Seeded default types.")
-        
+
+        # Users table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                pin VARCHAR(20),
+                email VARCHAR(150),
+                phone VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         conn.commit()
         cur.close()
         conn.close()

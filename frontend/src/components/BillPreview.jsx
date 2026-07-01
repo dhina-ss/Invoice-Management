@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import tidyLogo from '../assets/TIDY (2).png';
@@ -84,7 +84,18 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 };
 
-export default function BillPreview({ activeBill, customAddresses, onSaveBill }) {
+export default function BillPreview({
+  activeBill,
+  customAddresses,
+  onSaveBill,
+  onResetForm,
+  printRef,
+  signStatus,
+  setSignStatus,
+  signError,
+  setSignError,
+  isComplete
+}) {
   const { company: companyName, place, designation, noOfPersonal, noOfDuties, billDate, rate, fromDate, toDate, digitalSign, invoiceNumber } = activeBill;
 
   const selectedCompanyName = companyName || 'Tidy';
@@ -98,34 +109,15 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
   const tidyInvoiceRef = useRef(null); // wraps the printable Tidy invoice card
   const tidySigAreaRef = useRef(null); // wraps the signature placeholder area
 
-  // ── Digital signing state (Tidy only) ──────────────────────────────────────
-  const [signStatus, setSignStatus] = useState('idle'); // 'idle'|'capturing'|'signing'|'done'|'error'
-  const [signError, setSignError] = useState('');
-
-  const isComplete = (isElite || isAllCare)
-    ? !!(
-      selectedCompanyName?.trim() &&
-      (isAllCare ? (activeBill.billDate?.trim() && activeBill.fromDate?.trim() && activeBill.toDate?.trim()) : true) &&
-      activeBill.eliteItems &&
-      activeBill.eliteItems.length > 0 &&
-      activeBill.eliteItems.every(item =>
-        (isElite ? item.date?.trim() : true) &&
-        (item.particulars?.trim() || item.description?.trim()) &&
-        item.qty !== undefined && item.qty !== null && String(item.qty).trim() !== '' && !isNaN(parseInt(item.qty, 10)) &&
-        item.rate !== undefined && item.rate !== null && String(item.rate).trim() !== '' && !isNaN(parseFloat(item.rate))
-      )
-    )
-    : !!(
-      selectedCompanyName?.trim() &&
-      place?.trim() &&
-      designation?.trim() &&
-      fromDate?.trim() &&
-      toDate?.trim() &&
-      billDate?.trim() &&
-      rate !== undefined && rate !== null && String(rate).trim() !== '' && !isNaN(parseFloat(rate)) &&
-      noOfPersonal !== undefined && noOfPersonal !== null && String(noOfPersonal).trim() !== '' && !isNaN(parseInt(noOfPersonal, 10)) &&
-      noOfDuties !== undefined && noOfDuties !== null && String(noOfDuties).trim() !== '' && !isNaN(parseInt(noOfDuties, 10))
-    );
+  // Register the handlePrint function in printRef on every render to ensure latest closures
+  useEffect(() => {
+    if (printRef) {
+      printRef.current = handlePrint;
+    }
+    return () => {
+      if (printRef) printRef.current = null;
+    };
+  });
 
   const displayPlace = place ? place.trim() : 'SALEM';
   const parsedDate = billDate ? new Date(billDate) : new Date();
@@ -245,10 +237,20 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
   // the backend for PKCS#11 signing, then trigger an auto-download.
   // Otherwise: open the browser print dialog as usual.
   const handlePrint = async () => {
+    const saved = await onSaveBill(false);
+    if (!saved) return;
+
+    // Wait briefly for state updates / UI render (e.g. invoice number)
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     if (isTidy && digitalSign) {
       await handleDownloadAndSign();
     } else {
       window.print();
+    }
+
+    if (onResetForm) {
+      onResetForm(true);
     }
   };
 
@@ -369,7 +371,7 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
     const eliteItems = activeBill.eliteItems || [];
     const eliteSubtotal = eliteItems.reduce((sum, item) => sum + (parseInt(item.qty, 10) || 0) * (parseFloat(item.rate) || 0), 0);
     const eliteTotal = eliteSubtotal;
-    const displayPlaceElite = String(place || 'Sulur Hub').toLowerCase().includes('salem') ? 'Salem Hub' : 'Coimbatore Hub';
+    const displayPlaceElite = place || 'Sulur Hub';
 
     const formatDateHyphens = (dateStr) => {
       if (!dateStr) return '—';
@@ -380,9 +382,9 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
 
     return (
       <div className="invoice-wrapper animated-fade-in">
-        <div className="tidy-invoice-card" style={{ color: '#1f2937' }}>
+        <div className="tidy-invoice-card" style={{ color: '#1f2937', padding: '2rem 3rem' }}>
           {/* Elite Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', borderBottom: '2px solid #1e293b', paddingBottom: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', borderBottom: '1px solid #1e293b', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <img src={company.logoSrc} alt={company.name} style={{ maxHeight: '100px', width: 'auto' }} />
             </div>
@@ -392,7 +394,7 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           </div>
 
           {/* Company & Invoice Meta Info */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '2rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '2rem', marginBottom: '0.5rem', textAlign: 'left' }}>
             <div style={{ fontSize: '12px', lineHeight: '1.5', color: '#4b5563' }}>
               <strong style={{ fontSize: '14px', color: '#1f2937' }}>{company.name}</strong><br />
               {(customAddresses?.elite?.company || 'No. 125, Annai Velakanni Nagar,\nSowripalayam, Coimbatore,\nTamilnadu - 641028.')
@@ -425,10 +427,10 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           </div>
 
           {/* Divider */}
-          <hr style={{ border: 0, borderTop: '1px solid #1e293b', marginBottom: '1.5rem' }} />
+          <hr style={{ border: 0, borderTop: '1px solid #1e293b', marginBottom: '0.5rem' }} />
 
           {/* Bill To & Supply To */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '2rem', marginBottom: '2rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '2rem', marginBottom: '0.5rem', textAlign: 'left' }}>
             <div style={{ flex: 1 }}>
               <h4 style={{ fontWeight: '700', marginBottom: '0.5rem', color: '#1f2937', fontSize: '12px', paddingBottom: '4px' }}>Bill To:</h4>
               <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.6', color: '#4b5563' }}>
@@ -448,16 +450,16 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           </div>
 
           {/* Elite Table */}
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div>
             <table style={{ width: 'calc(100% - 2px)', margin: '0 auto', borderCollapse: 'collapse', fontSize: '11px', border: '1px solid #e2e8f0' }}>
               <thead>
                 <tr style={{ backgroundColor: '#1e293b', color: '#ffffff' }}>
-                  <th style={{ padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>S.NO</th>
-                  <th style={{ padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>DATE</th>
-                  <th style={{ padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'left', border: '1px solid #e2e8f0' }}>PRODUCTS</th>
-                  <th style={{ padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>QTY</th>
-                  <th style={{ padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>RATE (₹)</th>
-                  <th style={{ padding: '0.6rem 0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>TOTAL (₹)</th>
+                  <th style={{ padding: '0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>S.NO</th>
+                  <th style={{ padding: '0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>DATE</th>
+                  <th style={{ padding: '0.4rem', fontWeight: '600', textAlign: 'left', border: '1px solid #e2e8f0' }}>PRODUCTS</th>
+                  <th style={{ padding: '0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>QTY</th>
+                  <th style={{ padding: '0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>RATE (₹)</th>
+                  <th style={{ padding: '0.4rem', fontWeight: '600', textAlign: 'center', border: '1px solid #e2e8f0' }}>TOTAL (₹)</th>
                 </tr>
               </thead>
               <tbody>
@@ -467,12 +469,12 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
                   const total = qty * rateVal;
                   return (
                     <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }}>
-                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{index + 1}</td>
-                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{formatDateHyphens(item.date)}</td>
-                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'left', border: '1px solid #e2e8f0', color: '#4b5563', fontWeight: '500' }}>{item.particulars ? item.particulars.toUpperCase() : 'TEA'}</td>
-                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{qty || ''}</td>
-                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{rateVal ? formatCurrency(rateVal) : ''}</td>
-                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{total ? formatCurrency(total) : ''}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{index + 1}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{formatDateHyphens(item.date)}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'left', border: '1px solid #e2e8f0', color: '#4b5563', fontWeight: '500' }}>{item.particulars ? item.particulars.toUpperCase() : 'TEA'}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{qty || ''}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{rateVal ? formatCurrency(rateVal) : ''}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{total ? formatCurrency(total) : ''}</td>
                     </tr>
                   );
                 })}
@@ -480,31 +482,23 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
             </table>
           </div>
 
-          {/* Subtotal, Charges, Total Box */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginTop: '1.5rem', marginBottom: '2.5rem' }}>
+          {/* Subtotal, Total Box */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', margin: '1rem' }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: '0 8px', fontSize: '11px', width: '250px' }}>
               <tbody>
                 <tr>
-                  <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: '700', color: '#4b5563' }}>SUBTOTAL</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'right', color: '#1f2937', width: '100px' }}>{eliteSubtotal ? formatCurrency(eliteSubtotal) : ''}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: '700', color: '#4b5563' }}>CHARGES</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'right', color: '#1f2937' }}>0.00</td>
-                </tr>
-                <tr>
-                  <td style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '8px 8px', textAlign: 'right', fontWeight: '800', color: '#1f2937' }}>TOTAL</td>
-                  <td style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '8px 8px', textAlign: 'right', fontWeight: '800', color: '#1f2937' }}>{eliteTotal ? formatCurrency(eliteTotal) : ''}</td>
+                  <td style={{ textAlign: 'right', fontWeight: '800', color: '#1f2937' }}>GRAND TOTAL</td>
+                  <td style={{ textAlign: 'right', fontWeight: '800', color: '#1f2937' }}>{eliteTotal ? formatCurrency(eliteTotal) : ''}</td>
                 </tr>
               </tbody>
             </table>
-            <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '0.5rem', fontStyle: 'italic', fontWeight: '500' }}>
+            <div style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic', fontWeight: '500' }}>
               ({numberToWords(eliteTotal || 0)})
             </div>
           </div>
 
           {/* Signatory for Elite */}
-          <div style={{ textAlign: 'right', marginTop: '2rem', marginBottom: '1rem', fontSize: '11px', color: '#374151' }}>
+          <div style={{ textAlign: 'right', margin: '2rem 0', fontSize: '11px', color: '#374151' }}>
             <p style={{ margin: 0, fontWeight: '700' }}>FOR {company.name.toUpperCase()}</p>
             {digitalSign ? (
               <div className="signature-display" style={{ alignItems: 'flex-end', margin: '0.25rem 0' }}>
@@ -532,37 +526,6 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           </div>
         </div>
 
-        {/* Invoice Actions */}
-        <div className="invoice-actions-bar" style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={onSaveBill}
-            disabled={!isComplete}
-            title={!isComplete ? "Please fill all form fields to save the bill" : "Save Invoice"}
-            style={{ flex: 1 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            {activeBill.id ? 'Update Invoice' : 'Save Invoice'}
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handlePrint}
-            disabled={!isComplete}
-            title={!isComplete ? "Please fill all form fields to print the bill" : "Print Bill (PDF)"}
-            style={{ flex: 1 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"></polyline>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-              <rect x="6" y="14" width="12" height="8"></rect>
-            </svg>
-            Print Bill (PDF)
-          </button>
-        </div>
       </div>
     );
   }
@@ -631,7 +594,7 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
-            marginBottom: '3rem',
+            marginBottom: '5rem',
             textAlign: 'left',
             alignItems: 'flex-start'
           }}>
@@ -663,7 +626,7 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           <div style={{ marginBottom: '1.5rem' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
-                <tr style={{ backgroundColor: '#000000', color: '#ffffff' }}>
+                <tr style={{ backgroundColor: '#363636', color: '#ffffff' }}>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'center', border: 'none', width: '60px' }}>S. NO</th>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'left', border: 'none' }}>DESCRIPTION</th>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'right', border: 'none', width: '80px' }}>QTY</th>
@@ -694,18 +657,10 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
           </div>
 
           {/* Totals Box on Right */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginTop: '1.5rem', marginBottom: '4rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginTop: '10rem' }}>
             <table style={{ borderCollapse: 'collapse', fontSize: '12px', width: '250px' }}>
               <tbody>
-                <tr>
-                  <td style={{ padding: '0.5rem 0.8rem', textAlign: 'left', fontWeight: '700', color: '#000000' }}>SUB TOTAL (₹)</td>
-                  <td style={{ padding: '0.5rem 0.8rem', textAlign: 'right', fontWeight: '700', color: '#000000' }}>{acSubtotal ? formatCurrency(acSubtotal) : '0.00'}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '0.5rem 0.8rem', textAlign: 'left', fontWeight: '700', color: '#000000' }}>CHARGES (₹)</td>
-                  <td style={{ padding: '0.5rem 0.8rem', textAlign: 'right', fontWeight: '700', color: '#000000' }}>{acCharges ? formatCurrency(acCharges) : '0.00'}</td>
-                </tr>
-                <tr style={{ backgroundColor: '#000000', color: '#ffffff' }}>
+                <tr style={{ backgroundColor: '#363636', color: '#ffffff' }}>
                   <td style={{ padding: '0.6rem 0.8rem', textAlign: 'left', fontWeight: '700' }}>GRAND TOTAL (₹)</td>
                   <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: '700' }}>{acGrandTotal ? formatCurrency(acGrandTotal) : '0.00'}</td>
                 </tr>
@@ -728,37 +683,6 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
 
         </div>
 
-        {/* Invoice Actions */}
-        <div className="invoice-actions-bar" style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={onSaveBill}
-            disabled={!isComplete}
-            title={!isComplete ? "Please fill all form fields to save the bill" : "Save Invoice"}
-            style={{ flex: 1 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            {activeBill.id ? 'Update Invoice' : 'Save Invoice'}
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handlePrint}
-            disabled={!isComplete}
-            title={!isComplete ? "Please fill all form fields to print the bill" : "Print Bill (PDF)"}
-            style={{ flex: 1 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"></polyline>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-              <rect x="6" y="14" width="12" height="8"></rect>
-            </svg>
-            Print Bill (PDF)
-          </button>
-        </div>
       </div>
     );
   }
@@ -920,114 +844,6 @@ export default function BillPreview({ activeBill, customAddresses, onSaveBill })
         </div>
       </div>
 
-      {/* Invoice Actions */}
-      <div className="invoice-actions-bar" style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={onSaveBill}
-            disabled={!isComplete}
-            title={!isComplete ? "Please fill all form fields to save the bill" : "Save Invoice"}
-            style={{ flex: 1 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            {activeBill.id ? 'Update Invoice' : 'Save Invoice'}
-          </button>
-          <button
-            id="tidy-download-btn"
-            className="btn btn-primary"
-            onClick={handlePrint}
-            disabled={!isComplete || signStatus === 'capturing' || signStatus === 'signing'}
-            title={
-              !isComplete
-                ? 'Please fill all form fields'
-                : (isTidy && digitalSign)
-                  ? 'Generate PDF, sign with USB token, and download'
-                  : 'Print Bill (PDF)'
-            }
-            style={{
-              flex: 1,
-              ...(isTidy && digitalSign && {
-                background: signStatus === 'done'
-                  ? 'linear-gradient(135deg, #059669, #047857)'
-                  : signStatus === 'error'
-                    ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
-                    : 'linear-gradient(135deg, #0d3b66, #1e5fa0)',
-                opacity: (signStatus === 'capturing' || signStatus === 'signing') ? 0.7 : 1,
-              }),
-            }}
-          >
-            {isTidy && digitalSign ? (
-              signStatus === 'capturing' ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                    style={{ animation: 'spin 1s linear infinite' }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                  Generating PDF…
-                </>
-              ) : signStatus === 'signing' ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                    style={{ animation: 'spin 1s linear infinite' }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                  Signing…
-                </>
-              ) : signStatus === 'done' ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  Signed &amp; Downloaded!
-                </>
-              ) : signStatus === 'error' ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                  </svg>
-                  Signing Failed — Retry
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <polyline points="9 12 11 14 15 10" />
-                  </svg>
-                  Download &amp; Sign PDF
-                </>
-              )
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                  <rect x="6" y="14" width="12" height="8"></rect>
-                </svg>
-                Print Bill (PDF)
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Error message */}
-        {isTidy && digitalSign && signError && (
-          <p style={{ margin: 0, fontSize: '0.78rem', color: '#dc2626', textAlign: 'center' }}>
-            ⚠ {signError}
-          </p>
-        )}
-
-        {/* Hint — shown only when digital sign is ON for Tidy */}
-        {isTidy && digitalSign && signStatus === 'idle' && (
-          <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', textAlign: 'center' }}>
-            🔐 Digital Signature is ON — clicking Download will auto-sign with your USB token
-          </p>
-        )}
-      </div>
     </div>
   );
 }

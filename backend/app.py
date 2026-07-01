@@ -11,6 +11,7 @@ from routes.places import places_bp
 from routes.particulars import particulars_bp
 from routes.types import types_bp
 from routes.sign import sign_bp
+from routes.users import users_bp
 
 
 def get_frontend_dist_path():
@@ -40,6 +41,7 @@ def create_app():
     app.register_blueprint(particulars_bp)
     app.register_blueprint(types_bp)
     app.register_blueprint(sign_bp)
+    app.register_blueprint(users_bp)
 
     # ── Health check ──────────────────────────────────────────────────────────
     @app.route("/api/health", methods=["GET"])

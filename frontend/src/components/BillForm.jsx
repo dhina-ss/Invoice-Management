@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import CustomSelect from './CustomSelect';
 
-export default function BillForm({ activeBill, onChange, onReset, settingsVersion }) {
+export default function BillForm({
+  activeBill,
+  onChange,
+  onReset,
+  settingsVersion,
+  onSaveBill,
+  onPrint,
+  isComplete,
+  signStatus,
+  signError
+}) {
   const [errors, setErrors] = useState({});
   const [places, setPlaces] = useState([]);
   const [particulars, setParticulars] = useState([]);
@@ -307,7 +317,7 @@ export default function BillForm({ activeBill, onChange, onReset, settingsVersio
   };
 
   return (
-    <div className="glass-card animated-fade-in" style={{ padding: '2rem' }}>
+    <div className="glass-card animated-fade-in" style={{ padding: '2rem', maxHeight: 'calc(100vh - 10rem)' }}>
       <h2 className="form-title">Deployment Invoice Details</h2>
       <form onSubmit={handleSubmit} className="bill-form" noValidate>
         {/* Company Input */}
@@ -966,8 +976,114 @@ export default function BillForm({ activeBill, onChange, onReset, settingsVersio
         )}
 
         {/* Action Buttons */}
-        <div style={{ marginTop: '1rem' }}>
-          <button type="button" className="btn btn-secondary" onClick={onReset}>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', marginBottom: '0.75rem' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onSaveBill}
+            disabled={!isComplete}
+            title={!isComplete ? 'Please fill all form fields to save the bill' : 'Save Invoice'}
+            style={{ flex: 1 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            <span style={{ verticalAlign: 'middle' }}>{activeBill.id ? 'Update Invoice' : 'Save Invoice'}</span>
+          </button>
+          <button
+            type="button"
+            id="tidy-download-btn"
+            className="btn btn-primary"
+            onClick={onPrint}
+            disabled={!isComplete || signStatus === 'capturing' || signStatus === 'signing'}
+            title={
+              !isComplete
+                ? 'Please fill all form fields'
+                : (activeBill.company === 'Tidy' && activeBill.digitalSign)
+                  ? 'Generate PDF, sign with USB token, and download'
+                  : 'Print Bill (PDF)'
+            }
+            style={{
+              flex: 1,
+              ...(activeBill.company === 'Tidy' && activeBill.digitalSign && {
+                background: signStatus === 'done'
+                  ? 'linear-gradient(135deg, #059669, #047857)'
+                  : signStatus === 'error'
+                    ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                    : 'linear-gradient(135deg, #0d3b66, #1e5fa0)',
+                opacity: (signStatus === 'capturing' || signStatus === 'signing') ? 0.7 : 1,
+              }),
+            }}
+          >
+            {activeBill.company === 'Tidy' && activeBill.digitalSign ? (
+              signStatus === 'capturing' ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ animation: 'spin 1s linear infinite', marginRight: '8px', verticalAlign: 'middle' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  <span style={{ verticalAlign: 'middle' }}>Generating PDF…</span>
+                </>
+              ) : signStatus === 'signing' ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ animation: 'spin 1s linear infinite', marginRight: '8px', verticalAlign: 'middle' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  <span style={{ verticalAlign: 'middle' }}>Signing…</span>
+                </>
+              ) : signStatus === 'done' ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span style={{ verticalAlign: 'middle' }}>Signed &amp; Downloaded!</span>
+                </>
+              ) : signStatus === 'error' ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+                    <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                  <span style={{ verticalAlign: 'middle' }}>Signing Failed — Retry</span>
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <polyline points="9 12 11 14 15 10" />
+                  </svg>
+                  <span style={{ verticalAlign: 'middle' }}>Sign PDF &amp; Download</span>
+                </>
+              )
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                <span style={{ verticalAlign: 'middle' }}>Print Bill (PDF)</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {activeBill.company === 'Tidy' && activeBill.digitalSign && signError && (
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: '#dc2626', textAlign: 'center' }}>
+            ⚠ {signError}
+          </p>
+        )}
+
+        {activeBill.company === 'Tidy' && activeBill.digitalSign && signStatus === 'idle' && (
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', color: '#64748b', textAlign: 'center' }}>
+            🔐 Digital Signature is ON — clicking Download will auto-sign with your USB token
+          </p>
+        )}
+
+        <div style={{ marginTop: '0.5rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={onReset} style={{ width: '100%' }}>
             Clear Form
           </button>
         </div>

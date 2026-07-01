@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import BillForm from './components/BillForm';
 import BillPreview from './components/BillPreview';
@@ -29,6 +29,45 @@ export default function App() {
   const [activeBill, setActiveBill] = useState(DEFAULT_BILL);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Hoisted visual state for digital signature printing/signing process
+  const [signStatus, setSignStatus] = useState('idle');
+  const [signError, setSignError] = useState('');
+
+  // Ref to invoke handlePrint inside BillPreview from BillForm
+  const printRef = useRef(null);
+
+  const checkIsComplete = (bill) => {
+    const isElite = bill.company === 'Elite';
+    const isAllCare = bill.company === 'All Care';
+
+    if (isElite || isAllCare) {
+      return !!(
+        bill.company?.trim() &&
+        (isAllCare ? (bill.billDate?.trim() && bill.fromDate?.trim() && bill.toDate?.trim()) : true) &&
+        bill.eliteItems &&
+        bill.eliteItems.length > 0 &&
+        bill.eliteItems.every(item =>
+          (isElite ? item.date?.trim() : true) &&
+          (item.particulars?.trim() || item.description?.trim()) &&
+          item.qty !== undefined && item.qty !== null && String(item.qty).trim() !== '' && !isNaN(parseInt(item.qty, 10)) &&
+          item.rate !== undefined && item.rate !== null && String(item.rate).trim() !== '' && !isNaN(parseFloat(item.rate))
+        )
+      );
+    } else {
+      return !!(
+        bill.company?.trim() &&
+        bill.place?.trim() &&
+        bill.designation?.trim() &&
+        bill.noOfPersonal?.trim() &&
+        bill.noOfDuties?.trim() &&
+        bill.rate?.trim() &&
+        bill.billDate?.trim() &&
+        bill.fromDate?.trim() &&
+        bill.toDate?.trim()
+      );
+    }
+  };
 
   const [customAddresses, setCustomAddresses] = useState({
     tidy: {
@@ -129,8 +168,12 @@ export default function App() {
 
   const handleFormChange = (updatedBill) => setActiveBill(updatedBill);
 
-  const handleResetForm = () => {
-    setActiveBill({ ...DEFAULT_BILL, billDate: new Date().toISOString().split('T')[0] });
+  const handleResetForm = (keepCompany = false) => {
+    setActiveBill(prev => ({
+      ...DEFAULT_BILL,
+      company: keepCompany === true ? prev.company : DEFAULT_BILL.company,
+      billDate: new Date().toISOString().split('T')[0]
+    }));
   };
 
   const handleSaveSettings = async () => {
@@ -151,9 +194,10 @@ export default function App() {
       alert('Error connecting to backend to save settings.');
     }
     setIsSettingsOpen(false);
+    navigate(-1);
   };
 
-  const handleSaveBill = async () => {
+  const handleSaveBill = async (autoClear = true) => {
     try {
       const isNew = !activeBill.id;
       let url = '/api/bills';
@@ -195,15 +239,23 @@ export default function App() {
 
       if (response.ok) {
         const savedBill = await response.json();
-        setActiveBill({ ...savedBill.data, id: savedBill.id, invoiceNumber: savedBill.invoiceNumber });
+        const updatedBill = { ...savedBill.data, id: savedBill.id, invoiceNumber: savedBill.invoiceNumber };
+        if (autoClear) {
+          handleResetForm(true);
+        } else {
+          setActiveBill(updatedBill);
+        }
         fetchBills();
         showToast(isNew ? 'Invoice saved to history!' : 'Invoice updated in history!');
+        return updatedBill;
       } else {
         alert('Failed to save invoice.');
+        return null;
       }
     } catch (err) {
       console.error('Error saving invoice:', err);
       alert('Error connecting to backend to save invoice.');
+      return null;
     }
   };
 
@@ -252,9 +304,11 @@ export default function App() {
   };
 
   const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
+  const isSettings = location.pathname === '/settings';
+  const isInvoicePage = location.pathname === '/invoice';
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isInvoicePage ? 'invoice-page-active' : ''}`}>
       <main className="main-layout">
         <header className="header">
           <h1>Invoice Management</h1>
@@ -283,7 +337,7 @@ export default function App() {
                 <line x1="16" y1="17" x2="8" y2="17"></line>
               </svg>
             </button>
-            <button className="icon-btn" title="Settings" onClick={() => setIsSettingsOpen(true)}>
+            <button className={`icon-btn ${isSettings ? 'active' : ''}`} title="Settings" onClick={() => navigate('/settings')}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -323,6 +377,11 @@ export default function App() {
                     onChange={handleFormChange}
                     onReset={handleResetForm}
                     settingsVersion={settingsVersion}
+                    onSaveBill={handleSaveBill}
+                    onPrint={() => printRef.current && printRef.current()}
+                    isComplete={checkIsComplete(activeBill)}
+                    signStatus={signStatus}
+                    signError={signError}
                   />
                 </section>
                 <section>
@@ -330,9 +389,33 @@ export default function App() {
                     activeBill={activeBill}
                     customAddresses={customAddresses}
                     onSaveBill={handleSaveBill}
+                    onResetForm={handleResetForm}
+                    printRef={printRef}
+                    signStatus={signStatus}
+                    setSignStatus={setSignStatus}
+                    signError={signError}
+                    setSignError={setSignError}
+                    isComplete={checkIsComplete(activeBill)}
                   />
                 </section>
               </>
+            }
+          />
+
+          {/* Settings */}
+          <Route
+            path="/settings"
+            element={
+              <div style={{ gridColumn: '1 / -1' }}>
+                <SettingsModal
+                  isOpen={true}
+                  inline={true}
+                  onClose={() => navigate(-1)}
+                  onSave={handleSaveSettings}
+                  customAddresses={customAddresses}
+                  onCustomAddressesChange={setCustomAddresses}
+                />
+              </div>
             }
           />
 
@@ -340,14 +423,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSave={handleSaveSettings}
-        customAddresses={customAddresses}
-        onCustomAddressesChange={setCustomAddresses}
-      />
 
       {toastMessage && (
         <div className="toast-notification">

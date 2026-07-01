@@ -21,6 +21,7 @@ from pyhanko.sign import signers
 from pyhanko.sign.fields import SigFieldSpec, append_signature_field
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 from pyhanko.sign.pkcs11 import PKCS11Signer
+from pyhanko.stamp import TextStampStyle
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 # Path to the PKCS#11 shared library (.dll) for the USB token driver.
@@ -146,9 +147,16 @@ def sign_pdf_bytes(
                     key_id=PKCS11_KEY_ID,
                 )
 
+                stamp_style = TextStampStyle(
+                    border_width=0,
+                    background=None,
+                    stamp_text='Digitally signed by %(signer)s\nDate: %(ts)s',
+                )
+
                 pdf_signer = signers.PdfSigner(
                     signers.PdfSignatureMetadata(field_name=SIG_FIELD_NAME),
                     signer=signer,
+                    stamp_style=stamp_style,
                 )
 
                 with open(tmp_out_path, "wb") as outf:

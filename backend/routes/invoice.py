@@ -29,9 +29,17 @@ def get_invoice_number():
 
     row = execute_query("SELECT * FROM invoice_counters WHERE company = %s", (company,), fetch_one=True)
     if not row:
+        initial_val = 0
+        if company == "Tidy":
+            initial_val = 6
+        elif company == "Elite":
+            initial_val = 33
+        elif company == "All Care":
+            initial_val = 140
+
         row = execute_query(
-            "INSERT INTO invoice_counters (company, counter) VALUES (%s, 0) RETURNING *",
-            (company,),
+            "INSERT INTO invoice_counters (company, counter) VALUES (%s, %s) RETURNING *",
+            (company, initial_val),
             fetch_one=True
         )
 
@@ -58,13 +66,21 @@ def get_invoice_number():
 
 @invoice_bp.route("/reset", methods=["POST"])
 def reset_counter():
-    """Reset the counter for a company back to 0. Body: { "company": "Tidy" }"""
+    """Reset the counter for a company back to starting offset. Body: { "company": "Tidy" }"""
     payload = request.get_json(force=True) or {}
     company = payload.get("company", "Tidy")
 
+    initial_val = 0
+    if company == "Tidy":
+        initial_val = 6
+    elif company == "Elite":
+        initial_val = 33
+    elif company == "All Care":
+        initial_val = 140
+
     execute_query(
-        "UPDATE invoice_counters SET counter = 0 WHERE company = %s",
-        (company,)
+        "UPDATE invoice_counters SET counter = %s WHERE company = %s",
+        (initial_val, company)
     )
 
     return jsonify({"message": f"Counter reset for {company}"}), 200
