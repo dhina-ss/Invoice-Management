@@ -15,8 +15,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 		} else if (company === 'All Care') {
 			const items = data.eliteItems || [];
 			const subtotal = items.reduce((sum, item) => sum + (parseInt(item.qty, 10) || 0) * (parseFloat(item.rate) || 0), 0);
-			const charges = Math.round(subtotal * 0.10 * 100) / 100;
-			return Math.round((subtotal + charges) * 100) / 100;
+			return Math.round(subtotal * 100) / 100;
 		} else {
 			// Tidy
 			const personnel = parseInt(data.noOfPersonal, 10) || 0;

@@ -399,6 +399,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
+  width: 794px;
+  min-height: 1123px;
+  box-sizing: border-box;
 }
 
 .tidy-header {
@@ -723,7 +726,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* PRINT MEDIA STYLESHEET */
 @page {
-  size: auto;
+  size: A4 portrait;
   margin: 0mm;
 }
 
@@ -777,7 +780,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
-    width: 100% !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
     page-break-after: avoid;
   }
 

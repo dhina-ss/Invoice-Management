@@ -557,7 +557,7 @@ export default function BillPreview({
 
     return (
       <div className="invoice-wrapper animated-fade-in">
-        <div className="tidy-invoice-card allcare-invoice" style={{ color: '#000000', backgroundColor: '#ffffff', minHeight: '842px', display: 'flex', flexDirection: 'column', position: 'relative', padding: '3rem' }}>
+        <div className="tidy-invoice-card allcare-invoice" style={{ color: '#000000', backgroundColor: '#ffffff', minHeight: '1123px', display: 'flex', flexDirection: 'column', position: 'relative', padding: '3rem' }}>
 
           {/* Header block: Logo clock + Brand name */}
           <div style={{
@@ -629,6 +629,7 @@ export default function BillPreview({
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'center', border: 'none', width: '60px' }}>S. NO</th>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'left', border: 'none' }}>DESCRIPTION</th>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'right', border: 'none', width: '80px' }}>QTY</th>
+                  <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'right', border: 'none', width: '90px' }}>NO. OF DUTIES</th>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'right', border: 'none', width: '100px' }}>PRICE (₹)</th>
                   <th style={{ padding: '0.6rem 0.8rem', fontWeight: '700', textAlign: 'right', border: 'none', width: '120px' }}>TOTAL (₹)</th>
                 </tr>
@@ -646,6 +647,7 @@ export default function BillPreview({
                       <td style={{ padding: '0.75rem 0.8rem', textAlign: 'center', color: '#000000', width: '60px' }}>{index + 1}</td>
                       <td style={{ padding: '0.75rem 0.8rem', textAlign: 'left', color: '#000000' }}>{desc}</td>
                       <td style={{ padding: '0.75rem 0.8rem', textAlign: 'right', color: '#000000' }}>{qty || '0'}</td>
+                      <td style={{ padding: '0.75rem 0.8rem', textAlign: 'right', color: '#000000' }}>{item.noOfDuties || '0'}</td>
                       <td style={{ padding: '0.75rem 0.8rem', textAlign: 'right', color: '#000000' }}>{rateVal ? formatCurrency(rateVal) : '0.00'}</td>
                       <td style={{ padding: '0.75rem 0.8rem', textAlign: 'right', color: '#000000' }}>{total ? formatCurrency(total) : '0.00'}</td>
                     </tr>

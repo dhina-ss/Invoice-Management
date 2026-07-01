@@ -827,6 +827,19 @@ export default function BillForm({
                         </div>
                       </div>
 
+                      {/* No. of Duties */}
+                      <div className="form-group" style={{ gap: '0.25rem' }}>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>No. of Duties</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          style={{ padding: '0.6rem 0.8rem' }}
+                          placeholder="0"
+                          value={item.noOfDuties || ''}
+                          onChange={(e) => handleEliteItemChange(index, 'noOfDuties', e.target.value)}
+                        />
+                      </div>
+
                       {/* Qty and Price */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                         <div className="form-group" style={{ gap: '0.25rem' }}>
