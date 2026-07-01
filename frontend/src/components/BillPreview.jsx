@@ -534,8 +534,7 @@ export default function BillPreview({
   if (company.shortName === 'ALL CARE') {
     const allCareItems = activeBill.eliteItems || [];
     const acSubtotal = allCareItems.reduce((sum, item) => sum + (parseInt(item.qty, 10) || 0) * (parseFloat(item.rate) || 0), 0);
-    const acCharges = Math.round(acSubtotal * 0.10 * 100) / 100; // 10% charges
-    const acGrandTotal = Math.round((acSubtotal + acCharges) * 100) / 100;
+    const acGrandTotal = Math.round(acSubtotal * 100) / 100;
 
     const formatDateAllCare = (dateStr) => {
       if (!dateStr) return '';
