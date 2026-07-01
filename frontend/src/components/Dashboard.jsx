@@ -99,15 +99,15 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 		return dateStr;
 	};
 
-	// Normalise old-format invoice numbers (TDY-0001 → TDY2600001, ELT-0003 → ELT2600003)
+	// Normalise old-format invoice numbers (TDY-0001 → TDY260001, ELT-0003 → ELT260003)
 	const normalizeInvoiceNumber = (num, billDate) => {
 		if (!num) return num;
-		const match = num.match(/^(TDY|ELT)-(\d+)$/);
+		const match = num.match(/^(TDY|ELT|ALC)-(\d+)$/);
 		if (match) {
 			const prefix = match[1];
 			const counter = parseInt(match[2], 10);
 			const yr = billDate && billDate.length >= 4 ? billDate.slice(2, 4) : new Date().getFullYear().toString().slice(-2);
-			return `${prefix}${yr}${String(counter).padStart(5, '0')}`;
+			return `${prefix}${yr}${String(counter).padStart(4, '0')}`;
 		}
 		return num;
 	};

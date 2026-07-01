@@ -217,12 +217,12 @@ export default function App() {
           finalInvoiceNumber = invData.invoiceNumber;
         }
       } else if (finalInvoiceNumber) {
-        const match = finalInvoiceNumber.match(/^(TDY|ELT)-(\d+)$/);
+        const match = finalInvoiceNumber.match(/^(TDY|ELT|ALC)-(\d+)$/);
         if (match) {
           const prefix = match[1];
           const counter = parseInt(match[2], 10);
           const billYear = activeBill.billDate ? activeBill.billDate.split('-')[0].substring(2) : new Date().getFullYear().toString().substring(2);
-          finalInvoiceNumber = `${prefix}${billYear}${String(counter).padStart(5, '0')}`;
+          finalInvoiceNumber = `${prefix}${billYear}${String(counter).padStart(4, '0')}`;
         }
       }
 

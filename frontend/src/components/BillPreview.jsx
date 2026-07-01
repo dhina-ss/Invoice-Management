@@ -151,23 +151,23 @@ export default function BillPreview({
   const sgstAmount = subtotal * taxRate;
   const grandTotal = Math.round(subtotal + cgstAmount + sgstAmount);
 
-  // Normalise old-format invoice numbers (TDY-0001 → TDY2600001, ELT-0003 → ELT2600003)
+  // Normalise old-format invoice numbers (TDY-0001 → TDY260001, ELT-0003 → ELT260003)
   const normalizeInvoiceNumber = (num) => {
     if (!num) return num;
-    const match = num.match(/^(TDY|ELT)-(\d+)$/);
+    const match = num.match(/^(TDY|ELT|ALC)-(\d+)$/);
     if (match) {
       const prefix  = match[1];
       const counter = parseInt(match[2], 10);
       // Use year from billDate if available, otherwise current year
       const yr = billDate && billDate.length >= 4 ? billDate.slice(2, 4) : new Date().getFullYear().toString().slice(-2);
-      return `${prefix}${yr}${String(counter).padStart(5, '0')}`;
+      return `${prefix}${yr}${String(counter).padStart(4, '0')}`;
     }
     return num;
   };
 
   // Display generated invoice number or placeholder
   const currentYear = new Date().getFullYear().toString().slice(-2);
-  const rawInvoiceNumber = invoiceNumber || (company.shortName === 'ELITE' ? `ELT${currentYear}00000` : company.shortName === 'ALL CARE' ? `ALC${currentYear}00000` : `TDY${currentYear}00000`);
+  const rawInvoiceNumber = invoiceNumber || (company.shortName === 'ELITE' ? `ELT${currentYear}0000` : company.shortName === 'ALL CARE' ? `ALC${currentYear}0000` : `TDY${currentYear}0000`);
   const displayInvoiceNumber = normalizeInvoiceNumber(rawInvoiceNumber);
 
   // Elite helper for client address
