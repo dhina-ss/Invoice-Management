@@ -45,22 +45,27 @@ def get_invoice_number():
 
     counter = row["counter"]
     if advance:
+        # Increment and persist the new value
         counter += 1
         execute_query(
             "UPDATE invoice_counters SET counter = %s WHERE company = %s",
             (counter, company)
         )
+        display_counter = counter
+    else:
+        # Peek: return the NEXT number without storing it
+        display_counter = counter + 1
 
     if company == "All Care":
-        invoice_number = f"ALC{year_suffix}{str(counter).zfill(4)}"
+        invoice_number = f"ALC{year_suffix}{str(display_counter).zfill(4)}"
     elif company == "Elite":
-        invoice_number = f"ELT{year_suffix}{str(counter).zfill(4)}"
+        invoice_number = f"ELT{year_suffix}{str(display_counter).zfill(4)}"
     else:
-        invoice_number = f"TDY{year_suffix}{str(counter).zfill(4)}"
+        invoice_number = f"TDY{year_suffix}{str(display_counter).zfill(4)}"
 
     return jsonify({
         "company": company,
-        "counter": counter,
+        "counter": display_counter,
         "invoiceNumber": invoice_number,
     }), 200
 
