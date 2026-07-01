@@ -24,7 +24,7 @@ def get_frontend_dist_path():
 
 def create_app():
     dist_path = get_frontend_dist_path()
-    app = Flask(__name__, static_folder=dist_path, static_url_path='/')
+    app = Flask(__name__)
 
     # Initialize PostgreSQL database and create tables if they don't exist
     init_db()
@@ -52,10 +52,10 @@ def create_app():
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_frontend(path):
-        if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-            return send_from_directory(app.static_folder, path)
+        if path != "" and os.path.exists(os.path.join(dist_path, path)):
+            return send_from_directory(dist_path, path)
         else:
-            return send_from_directory(app.static_folder, 'index.html')
+            return send_from_directory(dist_path, 'index.html')
 
     return app
 
