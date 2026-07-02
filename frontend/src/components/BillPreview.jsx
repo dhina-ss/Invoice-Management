@@ -693,7 +693,7 @@ export default function BillPreview({
           {/* Footer Address Centered */}
           <div className="allcare-footer" style={{ textAlign: 'center', fontSize: '10px', color: '#000000', lineHeight: '1.5', position: 'absolute', bottom: '3rem', left: '3rem', right: '3rem' }}>
             <hr style={{ border: 'none', borderTop: '1px solid #000000', marginBottom: '0.8rem', width: '100%' }} />
-            {(customAddresses?.allCare?.company || 'NO. 381/385, VENNU GOPAL LAYOUT, PN PALAYAM, PAPPANAICKENPALAYAM, COIMBATORE, TAMIL NADU – 641037.\nPhone: +91 95005 95749')
+            {('NO. 381/385, VENNU GOPAL LAYOUT, PN PALAYAM, PAPPANAICKENPALAYAM, COIMBATORE, TAMIL NADU – 641037.\nPhone: +91 63694 52719. Email: allcaremanagementservices@gmail.com')
               .split('\n').map((line, i) => <div key={i}>{line}</div>)}
           </div>
 
