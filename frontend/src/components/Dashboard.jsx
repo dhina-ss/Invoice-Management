@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import CustomSelect from './CustomSelect';
+import BillPreview from './BillPreview';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 
-export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBillStatus, onDeleteBill }) {
+export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBillStatus, onDeleteBill, customAddresses }) {
 
 	// Calculate grand total for a bill
 	const calculateGrandTotal = (bill) => {
@@ -27,6 +31,17 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 		}
 	};
 
+	// Get place/location value for a bill
+	const getPlaceValue = (bill) => {
+		const data = bill.data || {};
+		if (bill.company === 'All Care') {
+			const items = data.eliteItems || [];
+			const places = [...new Set(items.map(item => item.place).filter(Boolean))];
+			return places.join(', ') || '—';
+		}
+		return data.place || '—';
+	};
+
 	// States for filters
 	const [selectedCompany, setSelectedCompany] = useState('All');
 	const [selectedStatus, setSelectedStatus] = useState('All');
@@ -36,6 +51,8 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 	const [statusConfirm, setStatusConfirm] = useState(null);
 	const [tdsInput, setTdsInput] = useState('');
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
+	const [selectedBillIds, setSelectedBillIds] = useState(new Set());
+	const [downloading, setDownloading] = useState(false);
 	const itemsPerPage = 10;
 
 	// Reset page to 1 when filters change
@@ -146,6 +163,115 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 		setEndDate('');
 	};
 
+	// Checkbox selection helpers
+	const allPageIds = paginatedBills.map(b => b.id);
+	const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selectedBillIds.has(id));
+	const somePageSelected = allPageIds.some(id => selectedBillIds.has(id));
+
+	const toggleSelectAll = () => {
+		if (allPageSelected) {
+			setSelectedBillIds(prev => {
+				const next = new Set(prev);
+				allPageIds.forEach(id => next.delete(id));
+				return next;
+			});
+		} else {
+			setSelectedBillIds(prev => {
+				const next = new Set(prev);
+				allPageIds.forEach(id => next.add(id));
+				return next;
+			});
+		}
+	};
+
+	const toggleSelectBill = (id) => {
+		setSelectedBillIds(prev => {
+			const next = new Set(prev);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+	};
+
+	// Helper to generate a PDF instance for a single bill
+	const generatePDFInstance = async (bill) => {
+		// Wait a brief moment to ensure DOM elements are fully rendered
+		await new Promise(resolve => setTimeout(resolve, 150));
+
+		const wrapper = document.getElementById(`render-invoice-${bill.id}`);
+		if (!wrapper) {
+			console.error(`Render wrapper not found for bill ${bill.id}`);
+			return null;
+		}
+
+		const card = wrapper.querySelector('.tidy-invoice-card');
+		if (!card) {
+			console.error(`Invoice card not found for bill ${bill.id}`);
+			return null;
+		}
+
+		const canvas = await html2canvas(card, {
+			scale: 2, // 2x for print-quality crispness
+			useCORS: true,
+			backgroundColor: '#ffffff',
+			logging: false,
+		});
+
+		const imgData = canvas.toDataURL('image/png');
+		const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+		const pageW = pdf.internal.pageSize.getWidth();
+		const pageH = pdf.internal.pageSize.getHeight();
+		const ratio = canvas.width / canvas.height;
+		const imgW = pageW;
+		const imgH = pageW / ratio;
+		const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
+		pdf.addImage(imgData, 'PNG', 0, yOffset, imgW, imgH);
+		return pdf;
+	};
+
+	// Download selected bills as PDF (if single) or ZIP (if multiple)
+	const handleDownloadSelected = async () => {
+		const selectedBills = sortedBills.filter(b => selectedBillIds.has(b.id));
+		if (selectedBills.length === 0) return;
+
+		setDownloading(true);
+
+		try {
+			if (selectedBills.length === 1) {
+				const bill = selectedBills[0];
+				const pdf = await generatePDFInstance(bill);
+				if (pdf) {
+					const fileName = `${normalizeInvoiceNumber(bill.invoiceNumber, bill.billDate) || `INV-${bill.id}`}.pdf`;
+					pdf.save(fileName);
+				}
+			} else {
+				const zip = new JSZip();
+				for (const bill of selectedBills) {
+					const pdf = await generatePDFInstance(bill);
+					if (pdf) {
+						const pdfBlob = pdf.output('blob');
+						const fileName = `${normalizeInvoiceNumber(bill.invoiceNumber, bill.billDate) || `INV-${bill.id}`}.pdf`;
+						zip.file(fileName, pdfBlob);
+					}
+				}
+				const content = await zip.generateAsync({ type: 'blob' });
+				const url = URL.createObjectURL(content);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = `invoices_${new Date().toISOString().slice(0, 10)}.zip`;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+			}
+		} catch (err) {
+			console.error('Failed to generate PDF or ZIP:', err);
+			alert('Failed to generate file. Please try again.');
+		} finally {
+			setDownloading(false);
+		}
+	};
+
 	return (
 		<div className="dashboard-container animated-fade-in">
 
@@ -221,15 +347,13 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 				</div>
 			</div>
 			{/* Filters Section */}
-			<div className="glass-card" style={{ 
+			<div style={{ 
 				display: 'flex', 
 				flexWrap: 'wrap', 
 				gap: '1.25rem', 
 				alignItems: 'flex-end',
 				justifyContent: 'space-between',
-				border: 'none',
-				boxShadow: 'none',
-				background: 'transparent'
+				width: '100%'
 			}}>
 				<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', flex: 1, justifyContent: 'end' }}>
 					{/* Company Filter */}
@@ -239,8 +363,8 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 							onChange={(val) => setSelectedCompany(val)}
 							options={[
 								{ value: 'All', label: 'All Companies' },
-								{ value: 'Elite', label: 'Elite' },
 								{ value: 'All Care', label: 'All Care' },
+								{ value: 'Elite', label: 'Elite' },
 								{ value: 'Tidy', label: 'Tidy' },
 							]}
 							placeholder="All Companies"
@@ -286,6 +410,51 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 								onChange={(e) => setEndDate(e.target.value)}
 							/>
 						</div>
+
+						{/* Download Selected Button */}
+						<button
+							type="button"
+							title={downloading ? 'Generating files...' : selectedBillIds.size === 0 ? 'Select at least one invoice to download' : selectedBillIds.size === 1 ? 'Download selected invoice as PDF' : `Download ${selectedBillIds.size} selected invoices as ZIP`}
+							disabled={selectedBillIds.size === 0 || downloading}
+							onClick={handleDownloadSelected}
+							style={{
+								height: '42px',
+								width: '42px',
+								display: 'inline-flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								borderRadius: 'var(--border-radius-sm)',
+								border: `1px solid ${selectedBillIds.size > 0 && !downloading ? 'rgba(139, 92, 246, 0.4)' : 'var(--card-border)'}`,
+								background: selectedBillIds.size > 0 && !downloading ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.03)',
+								color: selectedBillIds.size > 0 && !downloading ? '#a78bfa' : 'var(--text-muted)',
+								cursor: (selectedBillIds.size === 0 || downloading) ? 'not-allowed' : 'pointer',
+								opacity: (selectedBillIds.size === 0 || downloading) ? 0.45 : 1,
+								transition: 'all 0.2s ease',
+								flexShrink: 0,
+							}}
+							onMouseEnter={(e) => {
+								if (selectedBillIds.size > 0 && !downloading) {
+									e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+									e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.7)';
+								}
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.background = selectedBillIds.size > 0 && !downloading ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.03)';
+								e.currentTarget.style.borderColor = selectedBillIds.size > 0 && !downloading ? 'rgba(139, 92, 246, 0.4)' : 'var(--card-border)';
+							}}
+						>
+							{downloading ? (
+								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+									<path d="M21 12a9 9 0 1 1-6.219-8.56" />
+								</svg>
+							) : (
+								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+									<polyline points="7 10 12 15 17 10" />
+									<line x1="12" y1="15" x2="12" y2="3" />
+								</svg>
+							)}
+						</button>
 					</div>
 				</div>
 
@@ -331,17 +500,33 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 			{/* Invoice Details Table */}
 			<div className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 'none' }}>
 				{/* Header Table (Static) */}
-				<div className="dashboard-table-header-wrapper" style={{ scrollbarGutter: 'stable' }}>
+				<div className="dashboard-table-header-wrapper" style={{ 
+					scrollbarGutter: 'stable',
+					borderTopLeftRadius: 'var(--border-radius-lg)',
+					borderTopRightRadius: 'var(--border-radius-lg)',
+					overflow: 'hidden',
+					backgroundColor: '#1c1c30'
+				}}>
 					<table className="dashboard-table" style={{ width: '100%', tableLayout: 'fixed', marginBottom: 0 }}>
 						<thead>
 							<tr>
+								<th style={{ width: '3%', backgroundColor: '#1c1c30', padding: '1.25rem 0.5rem 1.25rem 1.25rem', textAlign: 'center' }}>
+									<input
+										type="checkbox"
+										checked={allPageSelected}
+										ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+										onChange={toggleSelectAll}
+										style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+									/>
+								</th>
 								<th style={{ width: '5%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>S.No</th>
-								<th style={{ width: '12%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>Invoice No</th>
-								<th style={{ width: '12%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>Bill Date</th>
-								<th style={{ width: '13%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>Company</th>
-								<th style={{ width: '14%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'right' }}>Bill Total</th>
-								<th style={{ width: '14%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'right' }}>Total</th>
-								<th style={{ width: '12%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'center' }}>Status</th>
+								<th style={{ width: '11%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>Invoice No</th>
+								<th style={{ width: '10%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>Bill Date</th>
+								<th style={{ width: '10%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem' }}>Company</th>
+								<th style={{ width: '11%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'left' }}>Location</th>
+								<th style={{ width: '12%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'right' }}>Bill Total</th>
+								<th style={{ width: '12%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'right' }}>Total</th>
+								<th style={{ width: '11%', backgroundColor: '#1c1c30', padding: '1.25rem 1rem', textAlign: 'center' }}>Status</th>
 								<th style={{ textAlign: 'right', width: '13%', backgroundColor: '#1c1c30', padding: '1.25rem 2.5rem' }}>Action</th>
 							</tr>
 						</thead>
@@ -352,19 +537,21 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 				<div className="dashboard-table-wrapper" style={{ height: '350px', overflowY: 'auto', scrollbarGutter: 'stable' }}>
 					<table className="dashboard-table" style={{ width: '100%', tableLayout: 'fixed' }}>
 						<colgroup>
+							<col style={{ width: '3%' }} />
 							<col style={{ width: '5%' }} />
+							<col style={{ width: '11%' }} />
+							<col style={{ width: '10%' }} />
+							<col style={{ width: '10%' }} />
+							<col style={{ width: '11%' }} />
 							<col style={{ width: '12%' }} />
 							<col style={{ width: '12%' }} />
+							<col style={{ width: '11%' }} />
 							<col style={{ width: '13%' }} />
-							<col style={{ width: '14%' }} />
-							<col style={{ width: '14%' }} />
-							<col style={{ width: '12%' }} />
-							<col style={{ width: '12%' }} />
 						</colgroup>
 						<tbody>
 							{sortedBills.length === 0 ? (
 								<tr>
-									<td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+									<td colSpan="10" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
 										No invoices found. Use the invoice form to create one!
 									</td>
 								</tr>
@@ -374,9 +561,18 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 									const netTotal = bill.status === 'Received'
 										? (bill.data?.receivedAmount !== undefined ? bill.data.receivedAmount : (billTotal - (bill.data?.tds || 0)))
 										: billTotal;
+									const isSelected = selectedBillIds.has(bill.id);
 
 									return (
-										<tr key={bill.id}>
+										<tr key={bill.id} style={{ backgroundColor: isSelected ? 'rgba(139, 92, 246, 0.06)' : undefined }}>
+											<td style={{ textAlign: 'center', padding: '0.85rem 0.5rem 0.85rem 1.25rem' }}>
+												<input
+													type="checkbox"
+													checked={isSelected}
+													onChange={() => toggleSelectBill(bill.id)}
+													style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+												/>
+											</td>
 											<td>{startIndex + index + 1}</td>
 											<td>
 												<strong>{normalizeInvoiceNumber(bill.invoiceNumber, bill.billDate) || `INV-${String(bill.id).padStart(4, '0')}`}</strong>
@@ -394,6 +590,9 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 												}}>
 													{bill.company}
 												</span>
+											</td>
+											<td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getPlaceValue(bill)}>
+												{getPlaceValue(bill)}
 											</td>
 											<td style={{ textAlign: 'right' }}>₹ {formatCurrency(billTotal)}</td>
 											<td style={{ textAlign: 'right' }}>₹ {formatCurrency(netTotal)}</td>
@@ -822,6 +1021,24 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 				</div>,
 				document.body
 			)}
+
+			{/* Off-screen renderer for selected invoices to generate PDFs/ZIP */}
+			<div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', pointerEvents: 'none' }}>
+				{Array.from(selectedBillIds).map(id => {
+					const bill = bills.find(b => b.id === id);
+					if (!bill) return null;
+					return (
+						<div key={bill.id} id={`render-invoice-${bill.id}`} style={{ background: '#ffffff', width: '794px', minHeight: '1123px' }}>
+							<BillPreview 
+								activeBill={bill.data} 
+								customAddresses={customAddresses} 
+								signStatus="idle"
+								isComplete={true}
+							/>
+						</div>
+					);
+				})}
+			</div>
 
 			{/* Developer Footer */}
 			<div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '1rem' }}>

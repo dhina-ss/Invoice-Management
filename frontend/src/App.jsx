@@ -27,6 +27,7 @@ const DEFAULT_BILL = {
 
 export default function App() {
   const [activeBill, setActiveBill] = useState(DEFAULT_BILL);
+  const [formKey, setFormKey] = useState(0); // increments on each form reset to trigger invoice number re-fetch
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -155,7 +156,7 @@ export default function App() {
       }
     };
     fetchInvoiceNumber();
-  }, [activeBill.company, activeBill.id, activeBill.billDate]);
+  }, [activeBill.company, activeBill.id, activeBill.billDate, formKey]);
 
   useEffect(() => {
     if (isSettingsOpen) {
@@ -169,6 +170,7 @@ export default function App() {
   const handleFormChange = (updatedBill) => setActiveBill(updatedBill);
 
   const handleResetForm = (keepCompany = false) => {
+    setFormKey(k => k + 1); // force invoice number re-fetch on next render
     setActiveBill(prev => ({
       ...DEFAULT_BILL,
       company: keepCompany === true ? prev.company : DEFAULT_BILL.company,
@@ -361,6 +363,7 @@ export default function App() {
                   onViewChange={(view) => navigate(`/${view}`)}
                   onUpdateBillStatus={handleUpdateBillStatus}
                   onDeleteBill={handleDeleteBill}
+                  customAddresses={customAddresses}
                 />
               </div>
             }

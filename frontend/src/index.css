@@ -1134,6 +1134,10 @@ details.settings-section summary:hover {
   width: 100%;
 }
 
+.dashboard-container .glass-card{
+  overflow-y: none;
+}
+
 .dashboard-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

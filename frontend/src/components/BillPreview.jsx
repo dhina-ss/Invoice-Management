@@ -562,30 +562,45 @@ export default function BillPreview({
           {/* Header block: Logo clock + Brand name */}
           <div style={{
             display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
+            justifyContent: 'space-between',
+            alignItems: 'end',
             marginBottom: '5rem'
           }}>
-            <img src={company.logoSrc} alt={company.name} style={{ height: '90px', width: 'auto', display: 'block' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', paddingTop: '15px' }}>
-              <div style={{
-                fontSize: '50px',
-                fontWeight: '800',
-                color: '#0e2240',
-                lineHeight: '1.0',
-                letterSpacing: '-0.5px'
-              }}>
-                ALLCARE
+            <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            }}>
+              <img src={company.logoSrc} alt={company.name} style={{ height: '90px', width: 'auto', display: 'block' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', paddingTop: '15px' }}>
+                <div style={{
+                  fontSize: '50px',
+                  fontWeight: '800',
+                  color: '#0e2240',
+                  lineHeight: '1.0',
+                  letterSpacing: '-0.5px'
+                }}>
+                  ALLCARE
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: '#0e2240',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase'
+                }}>
+                  MANAGEMENT SERVICES
+                </div>
               </div>
-              <div style={{
-                fontSize: '16px',
-                fontWeight: '700',
-                color: '#0e2240',
-                letterSpacing: '1px',
-                textTransform: 'uppercase'
-              }}>
-                MANAGEMENT SERVICES
-              </div>
+            </div>
+            <div style={{
+              fontSize: '16px',
+              fontWeight: '800',
+              color: '#0e2240',
+              lineHeight: '1.0',
+              letterSpacing: '1px'
+            }}>
+              INVOICE
             </div>
           </div>
 
