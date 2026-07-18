@@ -472,9 +472,9 @@ export default function BillPreview({
                       <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{index + 1}</td>
                       <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{formatDateHyphens(item.date)}</td>
                       <td style={{ padding: '0.4rem', textAlign: 'left', border: '1px solid #e2e8f0', color: '#4b5563', fontWeight: '500' }}>{item.particulars ? item.particulars.toUpperCase() : 'TEA'}</td>
-                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{qty || ''}</td>
-                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{rateVal ? formatCurrency(rateVal) : ''}</td>
-                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563' }}>{total ? formatCurrency(total) : ''}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563', fontWeight: '800' }}>{qty || ''}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563', fontWeight: '800' }}>{rateVal ? formatCurrency(rateVal) : ''}</td>
+                      <td style={{ padding: '0.4rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#4b5563', fontWeight: '800' }}>{total ? formatCurrency(total) : ''}</td>
                     </tr>
                   );
                 })}
@@ -823,13 +823,39 @@ export default function BillPreview({
         <div className="tidy-digital-signature">
           <p>For {company.name}</p>
           {digitalSign ? (
-            // When digital sign is ON: show a blank placeholder.
-            // The visual SVG is removed so it doesn’t appear in the captured PDF.
+            // When digital sign is ON: show a blank placeholder with a faint tick mark background.
             // The real PKCS#11 signature widget will be placed here by pyhanko.
             <div
               ref={tidySigAreaRef}
-              style={{ height: '55px', width: '180px', marginLeft: 'auto' }}
-            />
+              style={{
+                height: '55px',
+                width: '180px',
+                marginLeft: 'auto',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <svg 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="#10b981" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                style={{
+                  position: 'absolute',
+                  width: '45px',
+                  height: '45px',
+                  opacity: 0.15,
+                  pointerEvents: 'none'
+                }}
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
           ) : (
             <div style={{ height: '45px' }}></div>
           )}

@@ -164,21 +164,21 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 	};
 
 	// Checkbox selection helpers
-	const allPageIds = paginatedBills.map(b => b.id);
-	const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selectedBillIds.has(id));
-	const somePageSelected = allPageIds.some(id => selectedBillIds.has(id));
+	const allFilteredIds = sortedBills.map(b => b.id);
+	const allFilteredSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedBillIds.has(id));
+	const someFilteredSelected = allFilteredIds.some(id => selectedBillIds.has(id));
 
 	const toggleSelectAll = () => {
-		if (allPageSelected) {
+		if (allFilteredSelected) {
 			setSelectedBillIds(prev => {
 				const next = new Set(prev);
-				allPageIds.forEach(id => next.delete(id));
+				allFilteredIds.forEach(id => next.delete(id));
 				return next;
 			});
 		} else {
 			setSelectedBillIds(prev => {
 				const next = new Set(prev);
-				allPageIds.forEach(id => next.add(id));
+				allFilteredIds.forEach(id => next.add(id));
 				return next;
 			});
 		}
@@ -513,8 +513,8 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 								<th style={{ width: '3%', backgroundColor: '#1c1c30', padding: '1.25rem 0.5rem 1.25rem 1.25rem', textAlign: 'center' }}>
 									<input
 										type="checkbox"
-										checked={allPageSelected}
-										ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+										checked={allFilteredSelected}
+										ref={el => { if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected; }}
 										onChange={toggleSelectAll}
 										style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)' }}
 									/>
