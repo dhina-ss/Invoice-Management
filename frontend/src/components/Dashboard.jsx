@@ -43,7 +43,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 	};
 
 	// States for filters
-	const [selectedCompany, setSelectedCompany] = useState('All');
+	const [selectedCompanies, setSelectedCompanies] = useState([]);
 	const [selectedStatus, setSelectedStatus] = useState('All');
 	const [startDate, setStartDate] = useState('');
 	const [endDate, setEndDate] = useState('');
@@ -58,12 +58,12 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 	// Reset page to 1 when filters change
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [selectedCompany, selectedStatus, startDate, endDate]);
+	}, [selectedCompanies, selectedStatus, startDate, endDate]);
 
 	// Filter bills based on current criteria
 	const filteredBills = bills.filter(bill => {
 		// Company filter
-		if (selectedCompany !== 'All' && bill.company !== selectedCompany) {
+		if (selectedCompanies.length > 0 && !selectedCompanies.includes(bill.company)) {
 			return false;
 		}
 
@@ -157,7 +157,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 	}, [sortedBills.length, totalPages, currentPage]);
 
 	const handleClearFilters = () => {
-		setSelectedCompany('All');
+		setSelectedCompanies([]);
 		setSelectedStatus('All');
 		setStartDate('');
 		setEndDate('');
@@ -359,10 +359,10 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 					{/* Company Filter */}
 					<div style={{ minWidth: '180px' }}>
 						<CustomSelect
-							value={selectedCompany}
-							onChange={(val) => setSelectedCompany(val)}
+							isMulti={true}
+							value={selectedCompanies}
+							onChange={(val) => setSelectedCompanies(val)}
 							options={[
-								{ value: 'All', label: 'All Companies' },
 								{ value: 'All Care', label: 'All Care' },
 								{ value: 'Elite', label: 'Elite' },
 								{ value: 'Tidy', label: 'Tidy' },
@@ -459,7 +459,7 @@ export default function Dashboard({ bills, onLoadBill, onViewChange, onUpdateBil
 				</div>
 
 				{/* Clear Filters Button */}
-				{(selectedCompany !== 'All' || selectedStatus !== 'All' || startDate || endDate) && (
+				{(selectedCompanies.length > 0 || selectedStatus !== 'All' || startDate || endDate) && (
 					<button 
 						type="button" 
 						className="btn btn-secondary animate-fade-in" 

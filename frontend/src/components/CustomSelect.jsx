@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-export default function CustomSelect({ id, value, onChange, options, placeholder, icon, error, className, style, containerStyle }) {
+export default function CustomSelect({ id, value, onChange, options, placeholder, icon, error, className, style, containerStyle, isMulti }) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
   const containerRef = useRef(null);
@@ -43,7 +43,11 @@ export default function CustomSelect({ id, value, onChange, options, placeholder
     };
   }, [isOpen]);
 
-  const selectedOption = options.find(o => o.value === value);
+  const selectedValues = isMulti ? (Array.isArray(value) ? value : []) : [];
+  const selectedOption = !isMulti ? options.find(o => o.value === value) : null;
+  const displayLabel = isMulti
+    ? (selectedValues.length > 0 ? selectedValues.map(v => options.find(o => o.value === v)?.label).filter(Boolean).join(', ') : placeholder || 'Select options')
+    : (selectedOption ? selectedOption.label : placeholder || 'Select option');
 
   const dropdown = isOpen && (
     <div
@@ -65,40 +69,60 @@ export default function CustomSelect({ id, value, onChange, options, placeholder
           No options available
         </div>
       ) : (
-        options.map((opt) => (
+        options.map((opt) => {
+          const isSelected = isMulti ? selectedValues.includes(opt.value) : opt.value === value;
+          return (
           <div
             key={opt.value}
             onMouseDown={(e) => {
               e.preventDefault();
-              onChange(opt.value);
-              setIsOpen(false);
+              if (isMulti) {
+                const newValue = selectedValues.includes(opt.value)
+                  ? selectedValues.filter(v => v !== opt.value)
+                  : [...selectedValues, opt.value];
+                onChange(newValue);
+              } else {
+                onChange(opt.value);
+                setIsOpen(false);
+              }
             }}
             style={{
               padding: '0.6rem 0.8rem',
               borderRadius: '8px',
               cursor: 'pointer',
               fontSize: '0.9rem',
-              color: opt.value === value ? '#ffffff' : 'var(--text-secondary)',
-              backgroundColor: opt.value === value ? 'var(--primary)' : 'transparent',
+              color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+              backgroundColor: (isSelected && !isMulti) ? 'var(--primary)' : (isSelected && isMulti ? 'rgba(255,255,255,0.03)' : 'transparent'),
               transition: 'all 0.15s ease',
               textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
             }}
             onMouseEnter={(e) => {
-              if (opt.value !== value) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+              if (!isSelected || isMulti) {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
                 e.currentTarget.style.color = '#ffffff';
               }
             }}
             onMouseLeave={(e) => {
-              if (opt.value !== value) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = 'var(--text-secondary)';
+              if (!isSelected || isMulti) {
+                e.currentTarget.style.backgroundColor = (isSelected && isMulti) ? 'rgba(255,255,255,0.03)' : 'transparent';
+                e.currentTarget.style.color = isSelected ? '#ffffff' : 'var(--text-secondary)';
               }
             }}
           >
-            {opt.label}
+            {isMulti && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                readOnly
+                style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }}
+              />
+            )}
+            <span>{opt.label}</span>
           </div>
-        ))
+        )})
       )}
     </div>
   );
@@ -119,7 +143,7 @@ export default function CustomSelect({ id, value, onChange, options, placeholder
           ...style,
         }}
       >
-        <span>{selectedOption ? selectedOption.label : placeholder || 'Select option'}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{displayLabel}</span>
         <svg
           width="16"
           height="16"
